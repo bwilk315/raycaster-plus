@@ -49,6 +49,7 @@ class Plane {
         bool inBounds(int x, int y) const;  // Checks if a point (x, y) is inside bounds of the plane.
         int maxData() const;  // Returns the highest value of a tile used.
         bool setData(int x, int y, int value);
+        bool setLine(int data, float slope, float height);
 };
 
 struct DDA_RayHitInfo {

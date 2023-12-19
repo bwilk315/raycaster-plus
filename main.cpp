@@ -48,6 +48,8 @@ int main() {
     memset(keyStates, false, SDL_NUM_SCANCODES);
     tpLastFrame = std::chrono::system_clock::now();
 
+    float TEMP = 0.0f;
+    
     /********** MAIN LOOP **********/
     while(runGame) {
         // Compute time that elapsed since the last frame (AKA delta time)
@@ -70,6 +72,13 @@ int main() {
                     break;
             }
         }
+
+        // Rotation!
+        TEMP += elapsedTime;
+        vec2f v = vec2f::RIGHT.rotate(TEMP);
+        float slope = v.y / v.x;
+        world.setLine(9, slope, 0.5f * (1.0f - slope));
+
         // Keyboard actions
         vec2f camDir = camera.getDirection(); // It is used later anyways
         if(keyStates[SDL_SCANCODE_ESCAPE]) {

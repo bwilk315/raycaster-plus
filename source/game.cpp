@@ -114,6 +114,15 @@ bool Plane::setData(int x, int y, int value) {
     }
     return false;
 }
+bool Plane::setLine(int data, float slope, float intercept) {
+    for(LineEquation& le : this->lines)
+        if(le.data == data) {
+            le.slope = slope;
+            le.intercept = intercept;
+            return true;
+        }
+    return false;
+}
 
 
 DDA_RayHitInfo::DDA_RayHitInfo() {
