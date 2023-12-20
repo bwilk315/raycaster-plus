@@ -32,6 +32,10 @@ int main() {
     const float aspectRatio = SCREEN_HEIGHT / (float)SCREEN_WIDTH;
     const int frameDurationMs = 1e3 / LOOP_FPS;
     Plane world = Plane("world.plane");
+
+    std::cout << world.getError() << std::endl;
+    //return 0;
+
     Camera camera = Camera(5.5f, 2.5f, FOV_ANGLE, 0);
     DDA_Algorithm dda = DDA_Algorithm(world, MAX_TILE_DIST);
     SDL_Window* window;

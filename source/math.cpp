@@ -1,7 +1,36 @@
 
 #include "../include/math.hpp"
 
-int length(int n) {
+bool isNumber(const std::string& str) {
+    int sLen = str.length();
+    if(sLen == 0)
+        return false;
+    
+    bool wasDot = false;
+    bool dotClosed = false;
+    for(int i = 0; i < sLen; i++) {
+        char ch = str[i];
+        // Digits
+        if(ch >= '0' && ch <= '9') {
+            dotClosed = true;
+        // Dot sign
+        } else if(ch == '.') {
+            if(wasDot)
+                return false;
+            wasDot = true;
+            dotClosed = false;
+        // Minus sign
+        } else if(ch == '-') {
+            if(i != 0)
+                return false;
+        // Everything else
+        } else {
+            return false;
+        }
+    }
+    return dotClosed;
+}
+int digitCount(int n) {
     int posNum = std::abs(n);
     int digits = 1;
     int power = 1;

@@ -16,7 +16,7 @@ struct LineEquation {
 
     LineEquation();
     LineEquation(int data, float slope, float intercept);
-    vec2f intersection(const LineEquation& other);
+    vec2f intersection(const LineEquation& other) const;
 };
 
 /* Describes a plane filled with data tiles, each having its unique position
@@ -25,6 +25,7 @@ struct LineEquation {
  * X axis grows when moving right, Y axis do so when moving up. */
 class Plane {
     private:
+        int error = 0;
         int width = 0;
         int height = 0;
         int* data = nullptr;
@@ -35,14 +36,22 @@ class Plane {
         int posToDataIndex(int x, int y) const;
 
     public:
+        enum {
+            SUCCESS,
+            CANNOT_OPEN_WORLD_FILE,
+            // (World file) Interpreter Failed To ...
+            IFT_READ_DIMENSIONS,
+            IFT_READ_WORLD,
+            IFT_READ_LINE_EQUATIONS,
+        };
 
-        /* Constructs a plane with dimensions (<width>, <height>).
-         * If <indexFill> flag is set, all plane tiles are set to their indices. */
-        Plane(int width, int height, bool indexFill = false);
-        Plane(const char* planeFile);
+        /* Constructs a plane with dimensions (<width>, <height>). */
+        Plane(int width, int height);
+        Plane(const std::string& planeFile);
         ~Plane();
         void fillData(int value);
         int getData(int x, int y) const;
+        int getError() const; // Returns the latest error registered
         LineEquation getLine(int data) const; // Get line equation for tile with given data
         int getHeight() const;
         int getWidth() const;

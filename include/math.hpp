@@ -2,10 +2,12 @@
 #ifndef _RMATH_HPP
 #define _RMATH_HPP
 
+#include <string>
 #include <cmath>
 
-// Returns how many characters does the number <n> occupy
-int length(int n);
+// Checks if number is integer (1, 2, ...) or float (1.2, 3.14, ...)
+bool isNumber(const std::string& str);
+int digitCount(int n);
 float clamp(float value, float min, float max);
 
 class vec2f;

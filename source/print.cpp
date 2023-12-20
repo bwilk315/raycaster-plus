@@ -11,21 +11,21 @@ void printVector(const vec2f& vec) {
     std::cout << "[ " << vec.x << " " << vec.y << " ]\n";
 }
 void printPlane(const Plane& plane, bool ticks, int nullId) {
-    int maxDataSpaces = length(plane.maxData());
-    int maxTickSpaces = std::max(length(plane.getWidth()), length(plane.getHeight()));
+    int maxDataSpaces = digitCount(plane.maxData());
+    int maxTickSpaces = std::max(digitCount(plane.getWidth()), digitCount(plane.getHeight()));
     // To print array-like form of the plane data using its implementation of
     // coordinates (read the Plane class description), Y needs to be inverted.
     for(int y = plane.getHeight() - 1; y != -1; y--) {
         // Draw vertical ticks.
         if(ticks) {
             std::cout << y;
-            printRepeated(" ", maxTickSpaces - length(y) + 1);
+            printRepeated(" ", maxTickSpaces - digitCount(y) + 1);
         }
         for(int x = 0; x != plane.getWidth(); x++) {
             int data = plane.getData(x, y);
             // Complete the tile numeric value with zeroes to make it look
             // more tiley in comparison to others.
-            int currSpaces = (maxDataSpaces + maxTickSpaces - 1) - length(data);
+            int currSpaces = (maxDataSpaces + maxTickSpaces - 1) - digitCount(data);
             if(data == nullId) {
                 printRepeated(" ", currSpaces);
                 std::cout << "  ";
@@ -41,7 +41,7 @@ void printPlane(const Plane& plane, bool ticks, int nullId) {
         printRepeated("*", maxTickSpaces);
         std::cout << ' ';
         for(int x = 0; x != plane.getWidth(); x++) {
-            printRepeated(" ", maxTickSpaces - length(x));
+            printRepeated(" ", maxTickSpaces - digitCount(x));
             std::cout << x << ' ';
         }
         std::cout << std::endl;

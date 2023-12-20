@@ -11,62 +11,76 @@ LineEquation::LineEquation(int data, float slope, float intercept) {
     this->slope = slope;
     this->intercept = intercept;
 }
-vec2f LineEquation::intersection(const LineEquation& other) {
-    // given k: y=a0*x+b0 and k: y=a1*x+b1, argument of the lines crossing is given by
-    // formula: x=(b1-b0)/(a0-a1), knowing x it is possible to know the intersection point.
+vec2f LineEquation::intersection(const LineEquation& other) const {
+    // given k: y=a0*x+b0 and k: y=a1*x+b1, argument of the lines' crossing is given by
+    // formula: x=(b1-b0)/(a0-a1), knowing x it is possible to know the intersection height.
     float x = (this->intercept - other.intercept) / (other.slope - this->slope);
-    float y = this->slope * x + this->intercept;
-    return vec2f(x, y);
+    return vec2f(x, this->slope * x + this->intercept);
 }
 
 int Plane::posToDataIndex(int x, int y) const {
-    x = x < 0 ? 1 : (x > this->width - 1 ? this->width - 1 : x);
-    y = y < 0 ? 1 : (y > this->height - 1 ? this->height - 1 : y);
     // If data was formed in 2D-array-like shape, bottom-left element would be
-    // the origin having position (0, 0)
-    return this->width * (this->height - y - 1) + (x);
+    // the origin having position (0, 0).
+    return this->width * (this->height - y - 1) + x;
 }
-Plane::Plane(int width, int height, bool indexFill) {
+Plane::Plane(int width, int height) {
     this->width = width;
     this->height = height;
     this->data = new int[width * height];
     this->lines = std::vector<LineEquation>();
-    if(indexFill) {
-        for(int i = 0; i < this->width * this->height; i++) {
-            this->data[i] = i;
-        }
-    }
 }
-Plane::Plane(const char* planeFile) {
+Plane::Plane(const std::string& planeFile) {
     std::ifstream file(planeFile);
-    if(!file.good())
+    if(!file.good()) {
+        this->error = Plane::CANNOT_OPEN_WORLD_FILE;
         return;
+    }
     
-    char buff[32];
+    // THIS NEEDS GENERALIZATION, MAYBE AS INTERPRETER CLASS
+    std::string bf0, bf1, bf2;
     // First two numbers are plane dimensions, use them to construct a plane
-    file >> buff;
-    this->width = atoi(buff);
-    file >> buff;
-    this->height = atoi(buff);
+    file >> bf0;
+    file >> bf1;
+    if(!isNumber(bf0) || !isNumber(bf1)) {
+        this->error = Plane::IFT_READ_DIMENSIONS;
+        return;
+    }
+    this->width = std::stoi(bf0);
+    this->height = std::stoi(bf1);
     this->data = new int[this->width * this->height];
     // Collect the actual map data
     for(int y = this->height - 1; y != -1; y--) {
         for(int x = 0; x != this->width; x++) {
-            file >> buff;
-            int tileData = atoi(buff);
-            this->setData(x, y, tileData);
+            file >> bf0;
+            if(!isNumber(bf0) || file.eof()) {
+                this->error = Plane::IFT_READ_WORLD;
+                return;
+            }
+            int tileData = std::stoi(bf0);
+            if(!this->setData(x, y, tileData)) {
+                this->error = Plane::IFT_READ_WORLD;
+                return;
+            }
         }
     }
-    // Collect information about line equations for tiles with specified data
+    // Collect information about line equations for tiles with specific data
     this->lines = std::vector<LineEquation>();
-    while(file >> buff) {
-        int tileData = atoi(buff);
-        file >> buff;
-        float slope = atof(buff);
-        file >> buff;
-        float intercept = atof(buff);
-        this->lines.push_back({ tileData, slope, intercept });
+    while(!file.eof()) {
+        int errSum = 0;
+        file >> bf0;
+        file >> bf1;
+        file >> bf2;
+        if(errSum || !isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2)) {
+            this->error = Plane::IFT_READ_LINE_EQUATIONS;
+            return;
+        }
+        this->lines.push_back({
+            std::stoi(bf0), // tile data
+            std::stof(bf1), // slope
+            std::stof(bf2)  // intercept
+        });
     }
+
     file.close();
 }
 Plane::~Plane() {
@@ -81,6 +95,9 @@ int Plane::getData(int x, int y) const {
     if(inBounds(x, y))
         return this->data[this->posToDataIndex(x, y)];
     return -1;
+}
+int Plane::getError() const {
+    return this->error;
 }
 LineEquation Plane::getLine(int data) const {
     LineEquation out;
