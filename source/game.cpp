@@ -1,112 +1,90 @@
 
 #include "../include/game.hpp"
 
+/**********************************************/
+/********** STRUCTURE: LINE EQUATION **********/
+/**********************************************/
+
 LineEquation::LineEquation() {
-    this->data = -1;
     this->slope = 0;
     this->intercept = 0;
 }
-LineEquation::LineEquation(int data, float slope, float intercept) {
-    this->data = data;
+LineEquation::LineEquation(float slope, float intercept) {
     this->slope = slope;
     this->intercept = intercept;
 }
 vec2f LineEquation::intersection(const LineEquation& other) const {
-    // given k: y=a0*x+b0 and k: y=a1*x+b1, argument of the lines' crossing is given by
-    // formula: x=(b1-b0)/(a0-a1), knowing x it is possible to know the intersection height.
     float x = (this->intercept - other.intercept) / (other.slope - this->slope);
     return vec2f(x, this->slope * x + this->intercept);
 }
 
+/*********************************************/
+/********** STRUCTURE: RAY HIT INFO **********/
+/*********************************************/
+
+RayHitInfo::RayHitInfo() {
+    this->distance = -1;
+    this->point = vec2f::ZERO;
+    this->side = false;
+}
+RayHitInfo::RayHitInfo(float distance, vec2f point, bool side) {
+    this->distance = distance;
+    this->point = point;
+    this->side = side;
+}
+
+/******************************************/
+/********** STRUCTURE: WALL INFO **********/
+/******************************************/
+
+WallInfo::WallInfo() {
+    this->id = -1;
+    this->normal = vec2f::ZERO;
+    this->geometry = LineEquation();
+}
+WallInfo::WallInfo(int id, vec2f normal, LineEquation geometry) {
+    this->id = id;
+    this->normal = normal;
+    this->geometry = geometry;
+}
+
+/**********************************/
+/********** CLASS: PLANE **********/
+/**********************************/
+
 int Plane::posToDataIndex(int x, int y) const {
-    // If data was formed in 2D-array-like shape, bottom-left element would be
-    // the origin having position (0, 0).
     return this->width * (this->height - y - 1) + x;
+}
+Plane::Plane() {
+    this->width = -1;
+    this->height = -1;
 }
 Plane::Plane(int width, int height) {
     this->width = width;
     this->height = height;
-    this->data = new int[width * height];
-    this->lines = std::vector<LineEquation>();
+    this->tiles = new int[width * height];
+    this->geometry = std::map<int, std::vector<LineEquation>>();
 }
-Plane::Plane(const std::string& planeFile) {
-    std::ifstream file(planeFile);
-    if(!file.good()) {
-        this->error = Plane::CANNOT_OPEN_WORLD_FILE;
-        return;
-    }
-    
-    // THIS NEEDS GENERALIZATION, MAYBE AS INTERPRETER CLASS
-    std::string bf0, bf1, bf2;
-    // First two numbers are plane dimensions, use them to construct a plane
-    file >> bf0;
-    file >> bf1;
-    if(!isNumber(bf0) || !isNumber(bf1)) {
-        this->error = Plane::IFT_READ_DIMENSIONS;
-        return;
-    }
-    this->width = std::stoi(bf0);
-    this->height = std::stoi(bf1);
-    this->data = new int[this->width * this->height];
-    // Collect the actual map data
-    for(int y = this->height - 1; y != -1; y--) {
-        for(int x = 0; x != this->width; x++) {
-            file >> bf0;
-            if(!isNumber(bf0) || file.eof()) {
-                this->error = Plane::IFT_READ_WORLD;
-                return;
-            }
-            int tileData = std::stoi(bf0);
-            if(!this->setData(x, y, tileData)) {
-                this->error = Plane::IFT_READ_WORLD;
-                return;
-            }
-        }
-    }
-    // Collect information about line equations for tiles with specific data
-    this->lines = std::vector<LineEquation>();
-    while(!file.eof()) {
-        int errSum = 0;
-        file >> bf0;
-        file >> bf1;
-        file >> bf2;
-        if(errSum || !isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2)) {
-            this->error = Plane::IFT_READ_LINE_EQUATIONS;
-            return;
-        }
-        this->lines.push_back({
-            std::stoi(bf0), // tile data
-            std::stof(bf1), // slope
-            std::stof(bf2)  // intercept
-        });
-    }
-
-    file.close();
+Plane::Plane(const std::string& file) {
+    this->geometry = std::map<int, std::vector<LineEquation>>();
+    this->load(file);
 }
 Plane::~Plane() {
-    if(this->data != nullptr) delete[] this->data;
+    if(this->tiles != nullptr)
+        delete[] this->tiles;
 }
-void Plane::fillData(int value) {
+void Plane::setAllTiles(int tileId) {
     for(int i = 0; i < this->width * this->height; i++) {
-        this->data[i] = value;
+        this->tiles[i] = tileId;
     }
 }
-int Plane::getData(int x, int y) const {
+bool Plane::inBounds(int x, int y) const {
+    return (x > -1 && x < this->width) && (y > -1 && y < this->height);
+}
+int Plane::getTile(int x, int y) const {
     if(inBounds(x, y))
-        return this->data[this->posToDataIndex(x, y)];
+        return this->tiles[this->posToDataIndex(x, y)];
     return -1;
-}
-int Plane::getError() const {
-    return this->error;
-}
-LineEquation Plane::getLine(int data) const {
-    LineEquation out;
-    for(const LineEquation& le : this->lines)
-        if(le.data == data) {
-            out = le;
-            break;
-        }
-    return out;
 }
 int Plane::getHeight() const {
     return this->height;
@@ -114,52 +92,108 @@ int Plane::getHeight() const {
 int Plane::getWidth() const {
     return this->width;
 }
-bool Plane::inBounds(int x, int y) const {
-    return (x > -1 && x < this->width) && (y > -1 && y < this->height);
-}
 int Plane::maxData() const {
     int max = 0;
     for(int i = 0; i < this->width * this->height; i++) {
-        if(this->data[i] > max) max = this->data[i];
+        if(this->tiles[i] > max) max = this->tiles[i];
     }
     return max;
 }
-bool Plane::setData(int x, int y, int value) {
+int Plane::setTile(int x, int y, int tileId) {
     if(this->inBounds(x, y)) {
-        this->data[this->posToDataIndex(x, y)] = value;
-        return true;
+        this->tiles[this->posToDataIndex(x, y)] = tileId;
+        return Plane::E_G_CLEAR;
     }
-    return false;
+    return Plane::E_G_TILE_NOT_FOUND;
 }
-bool Plane::setLine(int data, float slope, float intercept) {
-    for(LineEquation& le : this->lines)
-        if(le.data == data) {
-            le.slope = slope;
-            le.intercept = intercept;
-            return true;
+int Plane::setLine(int tileId, int lineId, float slope, float intercept) {
+    for(auto& ve : this->geometry)
+        if(ve.first == tileId) {
+            if(lineId < 0 || lineId > ve.second.size() - 1)
+                return Plane::E_G_LINE_NOT_FOUND;
+            ve.second.at(lineId).slope = slope;
+            ve.second.at(lineId).intercept = intercept;
+            return Plane::E_G_CLEAR;
         }
-    return false;
+    return Plane::E_G_TILE_NOT_FOUND;
+}
+int_pair Plane::load(const std::string& file) {
+    std::ifstream stream(file);
+    int line = 1;
+    if(!stream.good()) {
+        return int_pair(line, Plane::E_PF_FAILED_TO_LOAD);
+    }
+
+    const std::string SEMICOLON = ";";
+    std::string bf0, bf1, bf2; // Buffers for taking input
+    // Read world dimensions
+    stream >> bf0; // Width
+    stream >> bf1; // Height
+    stream >> bf2; // Semicolon
+
+    if(bf2 != SEMICOLON)
+        return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
+    if(!isNumber(bf0) || !isNumber(bf1))
+        return int_pair(line, Plane::E_PF_INVALID_DIMENSIONS);
+    this->width = (int)std::stof(bf0);
+    this->height = (int)std::stof(bf1);
+    this->tiles = new int[this->width * this->height];
+
+    // Read world tiles data
+    for(int y = this->height - 1; y != -1; y--) {
+        line++;
+        for(int x = 0; x != this->width; x++) {
+            stream >> bf0;
+            if(!isNumber(bf0))
+                return int_pair(line, Plane::E_PF_INVALID_TILE_DATA);
+            this->setTile(x, y, (int)std::stof(bf0));
+        }
+        stream >> bf0;
+        if(bf0 != SEMICOLON)
+            return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
+    }
+
+    // Read line equations (aka wall geometries)
+    while(true) {
+        line++;
+        stream >> bf0; // Tile (aka wall) id
+        stream >> bf1; // Line slope
+        stream >> bf2; // Line intercept
+
+        if(bf0 == SEMICOLON) // Two semicolons in a row indicate termination
+            break;
+        else if(!isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2))
+            return int_pair(line, Plane::E_PF_INVALID_LINE_DATA);
+        int id = (int)std::stof(bf0);
+        // Create vector entry if it does not exist
+        if(this->geometry.count(id) == 0)
+            this->geometry.insert(std::pair<int, std::vector<LineEquation>>(
+                id, std::vector<LineEquation>()
+            ));
+        // Add a new line equation for a specified tile id
+        this->geometry.at(id).push_back(
+            LineEquation(std::stof(bf1), std::stof(bf2))
+        );
+    }
+
+    stream.close();
+    return int_pair(line, Plane::E_PF_CLEAR);
+}
+std::vector<LineEquation> Plane::getLines(int id) const {
+    for(const auto& ve : this->geometry)
+        if(ve.first == id)
+            return ve.second;
+    return std::vector<LineEquation>();
 }
 
-
-DDA_RayHitInfo::DDA_RayHitInfo() {
-    this->data = -1;
-    this->distance = -1;
-    this->point = vec2f::ZERO;
-    this->side = false;
-}
-DDA_RayHitInfo::DDA_RayHitInfo(int data, float distance, vec2f point, bool side) {
-    this->data = data;
-    this->distance = distance;
-    this->point = point;
-    this->side = side;
-}
+/******************************************/
+/********** CLASS: DDA ALGORITHM **********/
+/******************************************/
 
 DDA_Algorithm::DDA_Algorithm(const Plane& plane, int maxTileDist) {
     this->plane = &plane;
-    this->hits = new DDA_RayHitInfo[maxTileDist];
+    this->hits = new RayHitInfo[maxTileDist];
     this->maxTileDistSquared = maxTileDist * maxTileDist; // Only square is useful
-    memset(this->hits, 0, maxTileDist);
 }
 DDA_Algorithm::~DDA_Algorithm() {
     if(this->hits != NULL) {
@@ -213,11 +247,11 @@ int DDA_Algorithm::sendRay(vec2f start, vec2f direction) {
         if(!this->plane->inBounds(mapPos.x, mapPos.y)) {
             break;
         } else {
-            int tileData = this->plane->getData(mapPos.x, mapPos.y);
+            int tileData = this->plane->getTile(mapPos.x, mapPos.y);
             if(tileData > 0) {
                 // Find the hit point by moving DDA-computed distance along sent ray direction
                 float pointDist = side ? sideDistX - deltaDistX : sideDistY - deltaDistY;
-                this->hits[hitCount++] = { tileData, pointDist, start + direction * pointDist, side };
+                this->hits[hitCount++] = { pointDist, start + direction * pointDist, side };
             }
         }
     }

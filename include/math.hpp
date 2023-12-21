@@ -2,6 +2,7 @@
 #ifndef _RMATH_HPP
 #define _RMATH_HPP
 
+#include <vector>
 #include <string>
 #include <cmath>
 

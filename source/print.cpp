@@ -22,7 +22,7 @@ void printPlane(const Plane& plane, bool ticks, int nullId) {
             printRepeated(" ", maxTickSpaces - digitCount(y) + 1);
         }
         for(int x = 0; x != plane.getWidth(); x++) {
-            int data = plane.getData(x, y);
+            int data = plane.getTile(x, y);
             // Complete the tile numeric value with zeroes to make it look
             // more tiley in comparison to others.
             int currSpaces = (maxDataSpaces + maxTickSpaces - 1) - digitCount(data);
