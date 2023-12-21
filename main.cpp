@@ -1,8 +1,9 @@
 
-//#define DEBUG_MODE
+#define DEBUG_MODE
 
 #include <iostream>
 #include <chrono>
+#include <set>
 #include <SDL2/SDL.h>
 #include "include/math.hpp"
 #include "include/print.hpp"
@@ -21,7 +22,7 @@
 #define FOV_ANGLE M_PI / 2
 #define TURN_SPEED M_PI / 1.5
 // World settings
-#define SUN_ANGLE M_PI / 2
+#define SUN_ANGLE M_PI / 6
 
 int ensureInteger(float n);
 float linePointDist(const Camera& cam, const vec2f& point);
@@ -31,7 +32,9 @@ int main() {
     const vec2f sunDir = vec2f::RIGHT.rotate(-1 * SUN_ANGLE);
     const float aspectRatio = SCREEN_HEIGHT / (float)SCREEN_WIDTH;
     const int frameDurationMs = 1e3 / LOOP_FPS;
-    Plane world("world.plane");
+    Plane world;
+    int_pair error = world.load("world.plane");
+    std::cout << "Plane file ERROR " << error.second << " at line " << error.first << std::endl;
 
     Camera camera = Camera(5.5f, 2.5f, FOV_ANGLE, 0);
     DDA_Algorithm dda = DDA_Algorithm(world, MAX_TILE_DIST);
@@ -116,143 +119,145 @@ int main() {
             vec2f camPos = camera.getPosition();
             // Send a ray, which will collect information about tiles it met during stepping,
             // then process gathered information.
-            int hits = dda.sendRay(camPos, rayDir);
-            bool missed = true; // Has a ray missed some tile line equation (has not hit its geometry)?
-            int hitIndex = 0;
 
             //TODO: CREATE ORDER-BASED DRAWING BY TAKING LOCAL INTERSECTION DISTANCE AS METERISTIC
-            bool absolutelyStop = false;
-            while(!absolutelyStop && hitIndex != hits) {
-                RayHitInfo hitInfo = dda.hits[hitIndex++];
-                
-                // The point of statement below is to first find exact point where ray hit the wall,
-                // second is to calculate a distance of projection onto the camera plane.
-                float perpHitDist;
-                int id = world.getTile(hitInfo.point.toInt().x, hitInfo.point.toInt().y);
-                auto lines = world.getLines(id);
+            // Create walls information given rays information
+            int hitCount = dda.sendRay(camPos, rayDir);
+            std::set<WallStripeInfo, std::less<WallStripeInfo>> walls;
+            for(int h = 0; h < hitCount; h++) {
+                RayHitInfo hi = dda.hits[h];
+                int tileId = world.getTile(hi.tile.x, hi.tile.y);
 
-                for(int li = 0; li < lines.size(); li++) {
-                    auto line = lines.at(li);
-
-                    LineEquation ray;
-                    if(id == -1) {
-                        // No line is defined for the tile, assume it is a cube by default
-                        perpHitDist = linePointDist(camera, hitInfo.point);
-                        missed = false;
-                    } else {
-                        // Line is defined, find the intersection point with the ray line equation,
-                        // notice that Y-intercepts of both equations are relative to the hit tile
-                        // integer position.
-                        ray.slope = rayDir.x == 0 ? 1e30 : (rayDir.y / rayDir.x);
-                        float rayIntX = 0; // Camera intercepts in both axes, IntX moves the line equation
-                        float rayIntY = 0; // horizontally, and IntY vertically.
-                        if(hitInfo.side) {
-                            rayIntY = hitInfo.point.y - (int)hitInfo.point.y;
-                            if(rayDir.x < 0) {
-                                rayIntX = 1;
-                            }
-                        } else {
-                            rayIntX = hitInfo.point.x - (int)hitInfo.point.x;
-                            if(rayDir.y < 0) {
-                                rayIntY = 1;
-                            } 
-                        }
-                        ray.intercept = rayIntY - ray.slope * rayIntX; // Total intercept
-                        // Finally, having both equations, obtain intersection point, then make it global
-                        // and compute the point-line distance being the projected distance.
-                        vec2f inter = line.intersection(ray);
-                        if(inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) {
-                            missed = true;
-                            continue;
-                        } else {
-                            vec2f tile = vec2f(
-                                ensureInteger(hitInfo.point.x), // Ensuring integers prevents them from flipping suddenly,
-                                ensureInteger(hitInfo.point.y)  // for example: it makes 5.9999 -> 6 and 6.0001 -> 6.
-                            );
-                            if(hitInfo.side) {
-                                if(rayDir.x < 0)
-                                    tile.x -= 1;
-                            } else {
-                                if(rayDir.y < 0)
-                                    tile.y -= 1;
-                            }
-                            perpHitDist = linePointDist(camera, tile + inter);
-                            missed = false;
-                            //stopFlag = true;
-                        }
+                // Find line equation describing the ray walk
+                LineEquation rayLine;
+                rayLine.slope = rayDir.x == 0 ? 1e30 : (rayDir.y / rayDir.x);
+                float rayIntX = 0; // Camera intercepts in both axes, IntX moves the line equation
+                float rayIntY = 0; // horizontally, and IntY vertically.
+                if(hi.side) {
+                    rayIntY = hi.point.y - (int)hi.point.y;
+                    if(rayDir.x < 0) {
+                        rayIntX = 1;
                     }
-                    // If any of walls was hit, ray should not walk to other tiles anymore
-                    if(!missed) {
-                        absolutelyStop = true;
-                    }
-
-                    // Find normal vector of the hit wall
-                    vec2f normal = (vec2f::RIGHT).rotate(-1 * atanf(1 / line.slope * -1));
-                    if(line.slope < 0) {
-                        // Make it point outside from the player prespective even now
-                        normal = normal.scale(-1);
-                    }
-                    // Choose a color for the wall
-                    uint8_t r, g, b;
-                    switch(id) {
-                        case 1:
-                            r = 255; g = 0; b = 0;
-                            break;
-                        case 2:
-                            r = 0; g = 255; b = 0;
-                            break;
-                        case 3:
-                            r = 0; g = 0; b = 255;
-                            break;
-                        default:
-                            r = 0; g = 0; b = 0;
-                            break;
-                    }
-                    if(id > 3) {
-                        r = 255; g = 255; b = 0;
-                    }
-                    // Apply simple normal-based shading if possible, otherwise just side-based
-                    if(id == -1) {
-                        if(hitInfo.side) {
-                            r *= 0.7;
-                            g *= 0.7;
-                            b *= 0.7;
-                        }
-                    } else {
-                        float dot = normal.dot(sunDir) * -1;
-                        r *= dot;
-                        g *= dot;
-                        b *= dot;
-                    }
-                    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
-
-                    // Display the ray by drawing an appropriate vertical strip, scaling is applied in
-                    // form of aspectRatio (to make everything have the same size across all resolutions),
-                    // and camera plane length (to make squares look always like squares).
-                    float scale = (1 / aspectRatio) * (1 / (2 * camera.getPlane().magnitude()));
-                    int lineHeight = (SCREEN_HEIGHT / perpHitDist) * scale;
-                    int drawStart = SCREEN_HEIGHT / 2 - lineHeight / 2;
-                    int drawEnd = SCREEN_HEIGHT / 2 + lineHeight / 2;
-                    drawStart = drawStart < 0 ? 0 : drawStart;
-                    drawEnd = drawEnd >= SCREEN_HEIGHT ? (SCREEN_HEIGHT - 1) : drawEnd;
-                    for(int i = 0; i < COLS_PER_RAY; i++) {
-                        SDL_RenderDrawLine(renderer, column + i, drawStart, column + i, drawEnd);
-                    }
-
-                    #ifdef DEBUG_MODE
-                    // This section is for debugging-purposes only
-                    if(column == SCREEN_WIDTH / 2 && hitIndex == 1) {
-                        //system("clear");
-                        //printf("frame time: %f\n", elapsedTime);
-                        // Draw a center cross with color being in contrast to the detected one
-                        r ^= 0xFFFFFF;
-                        g ^= 0xFFFFFF;
-                        b ^= 0xFFFFFF;
-                        SDL_SetRenderDrawColor(renderer, r, g, b, 255);
-                        SDL_RenderDrawLine(renderer, column, 0, column, SCREEN_HEIGHT);
-                    }
-                    #endif
+                } else {
+                    rayIntX = hi.point.x - (int)hi.point.x;
+                    if(rayDir.y < 0) {
+                        rayIntY = 1;
+                    } 
                 }
+                rayLine.intercept = rayIntY - rayLine.slope * rayIntX; // Total intercept
+
+                bool isAnyLine = false;
+                bool missedGeometry = true; // Has a ray missed some tile (has not hit its geometry)?
+                for(const LineEquation& le : world.getLines(tileId)) {
+                    isAnyLine = true;
+                    // Find normal vector of the hit wall
+                    vec2f normal = (vec2f::RIGHT).rotate(-1 * atanf(1 / le.slope * -1));
+
+                    if(le.slope < 0)
+                        normal = normal.scale(-1); // Make it consistent
+            
+                    // Line is defined, find the intersection point with the ray line equation,
+                    // notice that Y-intercepts of both equations are relative to the hit tile
+                    // integer position.
+                    // Finally, having both equations, obtain intersection point, then make it global
+                    // and compute the point-line distance being the projected distance.
+                    vec2f inter = le.intersection(rayLine);
+                    if(inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) {
+                        missedGeometry = true;
+                        continue; // Skip wall which is not hit
+                    } else {
+                        vec2f tile = vec2f(
+                            ensureInteger(hi.point.x), // Ensuring integers prevents them from flipping suddenly,
+                            ensureInteger(hi.point.y)  // for example: it makes 5.9999 -> 6 and 6.0001 -> 6.
+                        );
+                        if(hi.side) {
+                            if(rayDir.x < 0)
+                                tile.x -= 1;
+                        } else {
+                            if(rayDir.y < 0)
+                                tile.y -= 1;
+                        }
+                        missedGeometry = false;
+                        // Save the wall properties
+                        walls.insert({
+                            tileId,
+                            linePointDist(camera, tile + inter),
+                            normal,
+                        });
+                    }
+                }
+                if(!isAnyLine) {
+                    walls.insert({
+                        tileId,
+                        linePointDist(camera, hi.point),
+                        hi.side ? (vec2f::RIGHT * (rayDir.x < 0 ? 1 : -1)) : (vec2f::UP * (rayDir.y < 0 ? 1 : -1))
+                    });
+                    missedGeometry = false;
+                }
+                if(!missedGeometry)
+                    break;
+            }
+
+            // DRAW STRIPES
+            for(const WallStripeInfo& wall : walls) {
+                // Choose a color for the wall
+                uint8_t r, g, b;
+                switch(wall.id) {
+                    case 1:
+                        r = 255; g = 0; b = 0;
+                        break;
+                    case 2:
+                        r = 0; g = 255; b = 0;
+                        break;
+                    case 3:
+                        r = 0; g = 0; b = 255;
+                        break;
+                    default:
+                        r = 0; g = 0; b = 0;
+                        break;
+                }
+                if(wall.id > 3) {
+                    r = 255; g = 255; b = 0;
+                }
+                if(wall.id) {
+                    r = 255; g = 255; b = 0;
+                }
+                // Apply simple normal-based brightness if possible, otherwise just side-based
+                if(column == SCREEN_WIDTH / 2) {
+                    
+                }
+                float bn = -1 * wall.normal.dot(sunDir);
+                r *= bn;
+                g *= bn;
+                b *= bn;
+                SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+
+                // Display the ray by drawing an appropriate vertical strip, scaling is applied in
+                // form of aspectRatio (to make everything have the same size across all resolutions),
+                // and camera plane length (to make squares look always like squares).
+                float scale = (1 / aspectRatio) * (1 / (2 * camera.getPlane().magnitude()));
+                int lineHeight = (SCREEN_HEIGHT / wall.distance) * scale;
+                int drawStart = SCREEN_HEIGHT / 2 - lineHeight / 2;
+                int drawEnd = SCREEN_HEIGHT / 2 + lineHeight / 2;
+                drawStart = drawStart < 0 ? 0 : drawStart;
+                drawEnd = drawEnd >= SCREEN_HEIGHT ? (SCREEN_HEIGHT - 1) : drawEnd;
+                for(int i = 0; i < COLS_PER_RAY; i++) {
+                    SDL_RenderDrawLine(renderer, column + i, drawStart, column + i, drawEnd);
+                }
+
+                #ifdef DEBUG_MODE
+                // This section is for debugging-purposes only
+                if(column == SCREEN_WIDTH / 2) {
+                    //system("clear");
+                    //printf("frame time: %f\n", elapsedTime);
+                    // Draw a center cross with color being in contrast to the detected one
+                    r ^= 0xFFFFFF;
+                    g ^= 0xFFFFFF;
+                    b ^= 0xFFFFFF;
+                    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+                    SDL_RenderDrawLine(renderer, column, 0, column, SCREEN_HEIGHT);
+                }
+                #endif
             }
         }
 

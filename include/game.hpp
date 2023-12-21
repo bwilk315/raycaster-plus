@@ -22,20 +22,24 @@ struct LineEquation {
 
 struct RayHitInfo {
     float distance; // Distance traveled by a ray
+    vec2i tile;     // Hit tile position
     vec2f point;    // Global point hit by the ray
     bool side;      // Flag indicating if ray hit the tile from E/W direction
 
     RayHitInfo();
-    RayHitInfo(float distance, vec2f point, bool side);
+    RayHitInfo(float distance, vec2i tile, vec2f point, bool side);
 };
 
-struct WallInfo {
+/* Describes properties of vertical line being a part of some wall */
+struct WallStripeInfo {
     int id;                // Number indicating properties of a wall
+    float distance;        // Distance from a wall
     vec2f normal;          // Vector telling in which direction a wall is facing
-    LineEquation geometry; // Equation describing a wall geometry from the top perspective
 
-    WallInfo();
-    WallInfo(int id, vec2f normal, LineEquation geometry);
+    WallStripeInfo();
+    WallStripeInfo(int id, float distance, vec2f normal);
+    bool operator<(const WallStripeInfo& other) const;
+    bool operator>(const WallStripeInfo& other) const;
 };
 
 /* Describes a grid filled with tile data, each having its unique position in two-dimensional
@@ -90,20 +94,18 @@ class Plane {
 
 class DDA_Algorithm {
     private:
-        int maxTileDistSquared;
+        int maxTileDistSquared; // Only square is useful
         const Plane* plane;
 
     public:
-        // Array filled by <sendRay()> with information about hit tiles which stopped
-        // the algorithm.
-        RayHitInfo* hits;
+        // Array filled by <sendRay()> with information about hit tiles which stop the algorithm.
+        RayHitInfo* hits = nullptr;
 
         DDA_Algorithm(const Plane& plane, int maxTileDist);
         ~DDA_Algorithm();
-        /* Performs the algorithm for finding plane tiles which a ray walking
-         * from point <start> in direction <direction> touch, amount of touched
-         * tiles is returned, remember that ray ignores tiles with data 0.
-         * Information about next hit tiles is stored in <hits> array. */
+        /* Performs the algorithm for finding plane tiles which a ray walking from point <start>
+         * in direction <direction> touch, amount of touched tiles is returned, remember that ray
+         * ignores tiles with data 0. Information about next hit tiles is stored in <hits> array. */
         int sendRay(vec2f start, vec2f direction);
 };
 
@@ -116,19 +118,18 @@ class Camera {
         vec2f direction;
 
     public:
-
         Camera();
-        /* Constructs a camera and positions it in point (<x>, <y>), then sets
-         * its field of view to <fov> rad and initial direction to <dir> rad. */
+        /* Constructs a camera and positions it at point (<x>, <y>), then sets its field of view to
+         * <fov> rad and initial direction to <dir> rad. */
         Camera(float x, float y, float fov, float dir);
         void changeDirection(float radians);
         void changePosition(vec2f delta);
+        void setDirection(float radians);
+        void setPosition(vec2f pos);
         float getFieldOfView() const;
         vec2f getPlane() const;
         vec2f getPosition() const;
         vec2f getDirection() const;
-        void setDirection(float radians);
-        void setPosition(vec2f pos);
 };
 
 #endif

@@ -24,11 +24,13 @@ vec2f LineEquation::intersection(const LineEquation& other) const {
 
 RayHitInfo::RayHitInfo() {
     this->distance = -1;
+    this->tile = vec2i(0, 0);
     this->point = vec2f::ZERO;
     this->side = false;
 }
-RayHitInfo::RayHitInfo(float distance, vec2f point, bool side) {
+RayHitInfo::RayHitInfo(float distance, vec2i tile, vec2f point, bool side) {
     this->distance = distance;
+    this->tile = tile;
     this->point = point;
     this->side = side;
 }
@@ -37,15 +39,21 @@ RayHitInfo::RayHitInfo(float distance, vec2f point, bool side) {
 /********** STRUCTURE: WALL INFO **********/
 /******************************************/
 
-WallInfo::WallInfo() {
+WallStripeInfo::WallStripeInfo() {
     this->id = -1;
+    this->distance = -1;
     this->normal = vec2f::ZERO;
-    this->geometry = LineEquation();
 }
-WallInfo::WallInfo(int id, vec2f normal, LineEquation geometry) {
+WallStripeInfo::WallStripeInfo(int id, float distance, vec2f normal) {
     this->id = id;
+    this->distance = distance;
     this->normal = normal;
-    this->geometry = geometry;
+}
+bool WallStripeInfo::operator<(const WallStripeInfo& other) const {
+    return this->distance < other.distance;
+}
+bool WallStripeInfo::operator>(const WallStripeInfo& other) const {
+    return this->distance > other.distance;
 }
 
 /**********************************/
@@ -174,6 +182,10 @@ int_pair Plane::load(const std::string& file) {
         this->geometry.at(id).push_back(
             LineEquation(std::stof(bf1), std::stof(bf2))
         );
+        // Ensure semicolon at the end
+        stream >> bf0;
+        if(bf0 != SEMICOLON)
+            return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
     }
 
     stream.close();
@@ -193,12 +205,11 @@ std::vector<LineEquation> Plane::getLines(int id) const {
 DDA_Algorithm::DDA_Algorithm(const Plane& plane, int maxTileDist) {
     this->plane = &plane;
     this->hits = new RayHitInfo[maxTileDist];
-    this->maxTileDistSquared = maxTileDist * maxTileDist; // Only square is useful
+    this->maxTileDistSquared = maxTileDist * maxTileDist;
 }
 DDA_Algorithm::~DDA_Algorithm() {
-    if(this->hits != NULL) {
+    if(this->hits != nullptr)
         delete[] this->hits;
-    }
 }
 int DDA_Algorithm::sendRay(vec2f start, vec2f direction) {
     vec2i mapPos = start.toInt();
@@ -240,27 +251,26 @@ int DDA_Algorithm::sendRay(vec2f start, vec2f direction) {
         // Check if the tile is not exceeded the maximum distance
         int deltaPosX = mapPos.x - start.x;
         int deltaPosY = mapPos.y - start.y;
-        if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > maxTileDistSquared) {
+        if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > maxTileDistSquared)
             break;
-        }
         // Process the hit tile data, register it if possible
-        if(!this->plane->inBounds(mapPos.x, mapPos.y)) {
+        if(!this->plane->inBounds(mapPos.x, mapPos.y))
             break;
-        } else {
-            int tileData = this->plane->getTile(mapPos.x, mapPos.y);
-            if(tileData > 0) {
-                // Find the hit point by moving DDA-computed distance along sent ray direction
-                float pointDist = side ? sideDistX - deltaDistX : sideDistY - deltaDistY;
-                this->hits[hitCount++] = { pointDist, start + direction * pointDist, side };
-            }
+        int tileData = this->plane->getTile(mapPos.x, mapPos.y);
+        if(tileData != 0) {
+            // Find the hit point by moving DDA-computed distance along sent ray direction
+            float pointDist = side ? sideDistX - deltaDistX : sideDistY - deltaDistY;
+            this->hits[hitCount++] = { pointDist, mapPos, start + direction * pointDist, side };
         }
     }
     return hitCount;
 }
 
+/***********************************/
+/********** CLASS: CAMERA **********/
+/***********************************/
 
 Camera::Camera() {
-    // Defaults
     this->planeMagnitude = 1;
     this->fov = M_PI_2;
     this->plane = vec2f::RIGHT;
@@ -282,6 +292,13 @@ void Camera::changeDirection(float radians) {
 void Camera::changePosition(vec2f delta) {
     this->position = this->position + delta;
 }
+void Camera::setDirection(float radians) {
+    this->direction = vec2f::UP.rotate(radians);
+    this->plane = vec2f::RIGHT.rotate(radians) * this->planeMagnitude;
+}
+void Camera::setPosition(vec2f pos) {
+    this->position = pos;
+}
 float Camera::getFieldOfView() const {
     return this->fov;
 }
@@ -293,11 +310,4 @@ vec2f Camera::getPosition() const {
 }
 vec2f Camera::getDirection() const {
     return this->direction;
-}
-void Camera::setDirection(float radians) {
-    this->direction = vec2f::UP.rotate(radians);
-    this->plane = vec2f::RIGHT.rotate(radians) * this->planeMagnitude;
-}
-void Camera::setPosition(vec2f pos) {
-    this->position = pos;
 }
