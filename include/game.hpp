@@ -2,21 +2,23 @@
 #ifndef _GAME_HPP
 #define _GAME_HPP
 
-#include <iostream>
+#include <iostream> // Ekhem
 #include <fstream>
 #include <cmath>
 #include <vector>
 #include <map>
+#include <SDL2/SDL_pixels.h>
 #include "../include/math.hpp"
 
 typedef std::pair<int, int> int_pair;
 
 struct LineEquation {
+    int id;          // Number indicating properties of a line
     float slope;     // Line growth rate
     float intercept; // Displacement along Y axis
 
     LineEquation();
-    LineEquation(float slope, float intercept);
+    LineEquation(int id, float slope, float intercept);
     vec2f intersection(const LineEquation& other) const;
 };
 
@@ -30,14 +32,15 @@ struct RayHitInfo {
     RayHitInfo(float distance, vec2i tile, vec2f point, bool side);
 };
 
-/* Describes properties of vertical line being a part of some wall */
+/* Describes properties of vertical line being a part of some planar wall */
 struct WallStripeInfo {
-    int id;                // Number indicating properties of a wall
-    float distance;        // Distance from a wall
-    vec2f normal;          // Vector telling in which direction a wall is facing
+    int tileId;     // Number indicating tile properties
+    int lineId;     // This specifies line properties instead
+    float distance; // Distance from a wall
+    vec2f normal;   // Vector telling in which direction a wall is facing
 
     WallStripeInfo();
-    WallStripeInfo(int id, float distance, vec2f normal);
+    WallStripeInfo(int tileId, int lineId, float distance, vec2f normal);
     bool operator<(const WallStripeInfo& other) const;
     bool operator>(const WallStripeInfo& other) const;
 };
@@ -52,7 +55,8 @@ class Plane {
         int* tiles = nullptr;
         // Dictionary defining geometry (consisting of 1+ lines) for walls identified by id numbers
         std::map<int, std::vector<LineEquation>> geometry;
-        
+        std::map<int, SDL_Color> lineColors;
+
         /* Returns an index corresponding to data array element that is found at position (<x>, <y>). */
         int posToDataIndex(int x, int y) const;
 
@@ -68,7 +72,8 @@ class Plane {
             E_PF_MISSING_SEMICOLON,
             E_PF_INVALID_DIMENSIONS,
             E_PF_INVALID_TILE_DATA,
-            E_PF_INVALID_LINE_DATA
+            E_PF_INVALID_LINE_DATA,
+            E_PF_INVALID_COLOR_DATA
         };
 
         Plane();
@@ -88,6 +93,7 @@ class Plane {
         int setLine(int tileId, int lineId, float slope, float height);
         // Loads plane tiles data from a specified file
         int_pair load(const std::string& file);
+        SDL_Color getLineColor(int lineId) const;
         // Get all line equations for the tile with id <tileId>
         std::vector<LineEquation> getLines(int tileId) const;
 };

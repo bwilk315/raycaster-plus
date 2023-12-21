@@ -6,10 +6,12 @@
 /**********************************************/
 
 LineEquation::LineEquation() {
+    this->id = -1;
     this->slope = 0;
     this->intercept = 0;
 }
-LineEquation::LineEquation(float slope, float intercept) {
+LineEquation::LineEquation(int id, float slope, float intercept) {
+    this->id = id;
     this->slope = slope;
     this->intercept = intercept;
 }
@@ -40,12 +42,14 @@ RayHitInfo::RayHitInfo(float distance, vec2i tile, vec2f point, bool side) {
 /******************************************/
 
 WallStripeInfo::WallStripeInfo() {
-    this->id = -1;
+    this->tileId = -1;
+    this->lineId = -1;
     this->distance = -1;
     this->normal = vec2f::ZERO;
 }
-WallStripeInfo::WallStripeInfo(int id, float distance, vec2f normal) {
-    this->id = id;
+WallStripeInfo::WallStripeInfo(int tileId, int lineId, float distance, vec2f normal) {
+    this->tileId = tileId;
+    this->lineId = lineId;
     this->distance = distance;
     this->normal = normal;
 }
@@ -72,9 +76,11 @@ Plane::Plane(int width, int height) {
     this->height = height;
     this->tiles = new int[width * height];
     this->geometry = std::map<int, std::vector<LineEquation>>();
+    this->lineColors = std::map<int, SDL_Color>();
 }
 Plane::Plane(const std::string& file) {
     this->geometry = std::map<int, std::vector<LineEquation>>();
+    this->lineColors = std::map<int, SDL_Color>();
     this->load(file);
 }
 Plane::~Plane() {
@@ -133,7 +139,7 @@ int_pair Plane::load(const std::string& file) {
     }
 
     const std::string SEMICOLON = ";";
-    std::string bf0, bf1, bf2; // Buffers for taking input
+    std::string bf0, bf1, bf2, bf3; // Buffers for taking input
     // Read world dimensions
     stream >> bf0; // Width
     stream >> bf1; // Height
@@ -165,22 +171,23 @@ int_pair Plane::load(const std::string& file) {
     while(true) {
         line++;
         stream >> bf0; // Tile (aka wall) id
-        stream >> bf1; // Line slope
-        stream >> bf2; // Line intercept
-
         if(bf0 == SEMICOLON) // Two semicolons in a row indicate termination
             break;
-        else if(!isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2))
+        stream >> bf1; // Line identification number
+        stream >> bf2; // Line slope
+        stream >> bf3; // Line intercept
+        
+        if(!isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2) || !isNumber(bf3)) 
             return int_pair(line, Plane::E_PF_INVALID_LINE_DATA);
-        int id = (int)std::stof(bf0);
+        int tileId = (int)std::stof(bf0);
         // Create vector entry if it does not exist
-        if(this->geometry.count(id) == 0)
+        if(this->geometry.count(tileId) == 0)
             this->geometry.insert(std::pair<int, std::vector<LineEquation>>(
-                id, std::vector<LineEquation>()
+                tileId, std::vector<LineEquation>()
             ));
         // Add a new line equation for a specified tile id
-        this->geometry.at(id).push_back(
-            LineEquation(std::stof(bf1), std::stof(bf2))
+        this->geometry.at(tileId).push_back(
+            LineEquation((int)std::stof(bf1), std::stof(bf2), std::stof(bf3))
         );
         // Ensure semicolon at the end
         stream >> bf0;
@@ -188,8 +195,35 @@ int_pair Plane::load(const std::string& file) {
             return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
     }
 
+    // Read line colors (very similar to the previous one above)
+    while(true) {
+        line++;
+        stream >> bf0; // Line id
+        stream >> bf1; // Red channel
+        stream >> bf2; // Green channel
+        stream >> bf3; // Blue channel
+
+        if(bf0 == SEMICOLON)
+            break;
+        else if(!isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2) || !isNumber(bf3))
+            return int_pair(line, Plane::E_PF_INVALID_COLOR_DATA);
+        int lineId = (int)std::stof(bf0);
+        this->lineColors.insert(std::pair<int, SDL_Color>(
+            lineId, { (Uint8)std::stof(bf1), (Uint8)std::stof(bf2), (Uint8)std::stof(bf3), 255 }
+        ));
+        stream >> bf0;
+        if(bf0 != SEMICOLON)
+            return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
+    }
+
     stream.close();
     return int_pair(line, Plane::E_PF_CLEAR);
+}
+SDL_Color Plane::getLineColor(int lineId) const {
+    for(const auto& lc : this->lineColors)
+        if(lc.first == lineId)
+            return lc.second;
+    return { 0, 0, 0, 0 };
 }
 std::vector<LineEquation> Plane::getLines(int id) const {
     for(const auto& ve : this->geometry)

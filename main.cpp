@@ -1,5 +1,5 @@
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 #include <iostream>
 #include <chrono>
@@ -15,7 +15,7 @@
 #define SCREEN_WIDTH 1200
 #define SCREEN_HEIGHT 700
 #define LOOP_FPS 60
-#define COLS_PER_RAY 2
+#define COLS_PER_RAY 4
 #define MAX_TILE_DIST 30
 // Player settings
 #define MOVE_SPEED 3
@@ -123,7 +123,7 @@ int main() {
             //TODO: CREATE ORDER-BASED DRAWING BY TAKING LOCAL INTERSECTION DISTANCE AS METERISTIC
             // Create walls information given rays information
             int hitCount = dda.sendRay(camPos, rayDir);
-            std::set<WallStripeInfo, std::less<WallStripeInfo>> walls;
+            std::set<WallStripeInfo, std::greater<WallStripeInfo>> walls;
             for(int h = 0; h < hitCount; h++) {
                 RayHitInfo hi = dda.hits[h];
                 int tileId = world.getTile(hi.tile.x, hi.tile.y);
@@ -149,10 +149,21 @@ int main() {
                 bool isAnyLine = false;
                 bool missedGeometry = true; // Has a ray missed some tile (has not hit its geometry)?
                 for(const LineEquation& le : world.getLines(tileId)) {
+                    // WARNING! Skip flat lines, which indicate that you want to use cubes instead
+                    if(le.slope == 0 && le.intercept == 0) {
+                        walls.insert({
+                            tileId,
+                            le.id,
+                            linePointDist(camera, hi.point),
+                            hi.side ? (vec2f::RIGHT * (rayDir.x < 0 ? 1 : -1)) : (vec2f::UP * (rayDir.y < 0 ? 1 : -1))
+                        });
+                        missedGeometry = false;
+                        break;
+                    }
+
                     isAnyLine = true;
                     // Find normal vector of the hit wall
                     vec2f normal = (vec2f::RIGHT).rotate(-1 * atanf(1 / le.slope * -1));
-
                     if(le.slope < 0)
                         normal = normal.scale(-1); // Make it consistent
             
@@ -181,18 +192,11 @@ int main() {
                         // Save the wall properties
                         walls.insert({
                             tileId,
+                            le.id,
                             linePointDist(camera, tile + inter),
                             normal,
                         });
                     }
-                }
-                if(!isAnyLine) {
-                    walls.insert({
-                        tileId,
-                        linePointDist(camera, hi.point),
-                        hi.side ? (vec2f::RIGHT * (rayDir.x < 0 ? 1 : -1)) : (vec2f::UP * (rayDir.y < 0 ? 1 : -1))
-                    });
-                    missedGeometry = false;
                 }
                 if(!missedGeometry)
                     break;
@@ -201,36 +205,15 @@ int main() {
             // DRAW STRIPES
             for(const WallStripeInfo& wall : walls) {
                 // Choose a color for the wall
-                uint8_t r, g, b;
-                switch(wall.id) {
-                    case 1:
-                        r = 255; g = 0; b = 0;
-                        break;
-                    case 2:
-                        r = 0; g = 255; b = 0;
-                        break;
-                    case 3:
-                        r = 0; g = 0; b = 255;
-                        break;
-                    default:
-                        r = 0; g = 0; b = 0;
-                        break;
-                }
-                if(wall.id > 3) {
-                    r = 255; g = 255; b = 0;
-                }
-                if(wall.id) {
-                    r = 255; g = 255; b = 0;
-                }
+                SDL_Color color;
+                color = world.getLineColor(wall.lineId);
+                
                 // Apply simple normal-based brightness if possible, otherwise just side-based
-                if(column == SCREEN_WIDTH / 2) {
-                    
-                }
                 float bn = -1 * wall.normal.dot(sunDir);
-                r *= bn;
-                g *= bn;
-                b *= bn;
-                SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+                color.r *= bn;
+                color.g *= bn;
+                color.b *= bn;
+                SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
 
                 // Display the ray by drawing an appropriate vertical strip, scaling is applied in
                 // form of aspectRatio (to make everything have the same size across all resolutions),
@@ -248,13 +231,14 @@ int main() {
                 #ifdef DEBUG_MODE
                 // This section is for debugging-purposes only
                 if(column == SCREEN_WIDTH / 2) {
-                    //system("clear");
+                    system("clear");
                     //printf("frame time: %f\n", elapsedTime);
+                    //printVector(wall.normal);
                     // Draw a center cross with color being in contrast to the detected one
-                    r ^= 0xFFFFFF;
-                    g ^= 0xFFFFFF;
-                    b ^= 0xFFFFFF;
-                    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+                    color.r ^= 0xFFFFFF;
+                    color.g ^= 0xFFFFFF;
+                    color.b ^= 0xFFFFFF;
+                    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
                     SDL_RenderDrawLine(renderer, column, 0, column, SCREEN_HEIGHT);
                 }
                 #endif
