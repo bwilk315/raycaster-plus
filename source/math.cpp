@@ -1,37 +1,11 @@
 
 #include "../include/math.hpp"
 
-bool isNumber(const std::string& str) {
-    int sLen = str.length();
-    if(sLen == 0)
-        return false;
-    
-    bool wasDot = false;
-    bool dotClosed = false;
-    for(int i = 0; i < sLen; i++) {
-        char ch = str[i];
-        // Digits
-        if(ch >= '0' && ch <= '9') {
-            dotClosed = true;
-        // Dot sign
-        } else if(ch == '.') {
-            if(wasDot)
-                return false;
-            wasDot = true;
-            dotClosed = false;
-        // Minus sign
-        } else if(ch == '-') {
-            if(i != 0)
-                return false;
-        // SKIP FOR NOW
-        } else if(ch == '+' || ch == 'e') {
-            
-        // Everything else
-        } else {
-            return false;
-        }
-    }
-    return dotClosed;
+bool isFloat(const std::string& str) {
+    std::istringstream iss(str);
+    float _;
+    iss >> std::noskipws >> _;
+    return iss.eof() && !iss.fail();
 }
 int digitCount(int n) {
     int posNum = std::abs(n);

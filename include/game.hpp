@@ -4,8 +4,8 @@
 
 #include <iostream> // Ekhem
 #include <fstream>
-#include <cmath>
 #include <vector>
+#include <cmath>
 #include <map>
 #include <SDL2/SDL_pixels.h>
 #include "../include/math.hpp"
@@ -13,14 +13,13 @@
 typedef std::pair<int, int> int_pair;
 
 struct LineEquation {
-    int id;          // Number indicating properties of a line
-    float slope;     // Line growth rate
-    float intercept; // Displacement along Y axis
-    float domainStart;
-    float domainEnd;
+    float slope;       // Line growth rate
+    float intercept;   // Displacement along Y axis
+    float domainStart; // <0; 1>
+    float domainEnd;   // <0; 1>
 
     LineEquation();
-    LineEquation(int id, float slope, float intercept, float domainStart, float domainEnd);
+    LineEquation(float slope, float intercept, float domainStart, float domainEnd);
     vec2f intersection(const LineEquation& other) const;
 };
 
@@ -33,6 +32,16 @@ struct RayHitInfo {
     RayHitInfo(float distance, vec2i tile, vec2f point, bool side);
 };
 
+/* Information about a single wall inbounded in some tile. Line created using the information
+ * is a top-view of that wall. */
+struct WallInfo {
+    LineEquation line;
+    SDL_Color color;   // all channels: <0; 255>
+
+    WallInfo();
+    WallInfo(LineEquation line, SDL_Color color);
+};
+
 /* Describes a grid filled with tile data, each having its unique position in two-dimensional
  * cartesian coordinates system. The origin point (0, 0) is located at the bottom-left corner
  * of the grid, X axis grows when moving right, Y axis do so when moving up. */
@@ -42,8 +51,7 @@ class Plane {
         int height = 0;
         int* tiles = nullptr;
         // Dictionary defining geometry (consisting of 1+ lines) for walls identified by id numbers
-        std::map<int, std::vector<LineEquation>> geometry;
-        std::map<int, SDL_Color> lineColors;
+        std::map<int, std::vector<WallInfo>> walls;
 
         /* Returns an index corresponding to data array element that is found at position (<x>, <y>). */
         int posToDataIndex(int x, int y) const;
@@ -53,15 +61,12 @@ class Plane {
             // General errors
             E_G_CLEAR = 0,
             E_G_TILE_NOT_FOUND,
-            E_G_LINE_NOT_FOUND,
             // Plane file errors
             E_PF_CLEAR = 3,
             E_PF_FAILED_TO_LOAD,
-            E_PF_MISSING_SEMICOLON,
-            E_PF_INVALID_DIMENSIONS,
-            E_PF_INVALID_TILE_DATA,
-            E_PF_INVALID_LINE_DATA,
-            E_PF_INVALID_COLOR_DATA
+            E_PF_OPERATION_NOT_AVAILABLE, // Operation depends on something that is not done yet
+            E_PF_UNKNOWN_NUMBER_FORMAT,   // It can be caused by a text not being an actual number
+            E_PF_INVALID_ARGUMENTS_COUNT
         };
 
         Plane();
@@ -72,18 +77,17 @@ class Plane {
         void setAllTiles(int tileId);
         // Checks if a point (<x>, <y>) is inside bounds of the plane
         bool inBounds(int x, int y) const;
-        int getTile(int x, int y) const;
+        int getTileData(int x, int y) const;
         int getHeight() const;
         int getWidth() const;
         int maxData() const;  // Returns the highest value of a tile used.
-        int setTile(int x, int y, int tileId);
+        int setTileData(int x, int y, int tileData);
         // Sets properties of line with id <lineId> belonging to a tile with id <tileId>
-        int setLine(int tileId, int lineId, float slope, float intercept, float domainStart = -1, float domainEnd = -1);
+        void setTileWall(int tileData, int wallIndex, LineEquation line, SDL_Color color);
         // Loads plane tiles data from a specified file
         int_pair load(const std::string& file);
-        SDL_Color getLineColor(int lineId) const;
         // Get all line equations for the tile with id <tileId>
-        std::vector<LineEquation> getLines(int tileId) const;
+        std::vector<WallInfo> getTileWalls(int tileData) const;
 };
 
 /* Class providing DDA algorithm in a stepping-like way. First initialize it using <init> function,

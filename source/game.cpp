@@ -6,12 +6,10 @@
 /**********************************************/
 
 LineEquation::LineEquation() {
-    this->id = -1;
     this->slope = 0;
     this->intercept = 0;
 }
-LineEquation::LineEquation(int id, float slope, float intercept, float domainStart, float domainEnd) {
-    this->id = id;
+LineEquation::LineEquation(float slope, float intercept, float domainStart, float domainEnd) {
     this->slope = slope;
     this->intercept = intercept;
     this->domainStart = domainStart;
@@ -37,6 +35,19 @@ RayHitInfo::RayHitInfo(float distance, vec2i tile, vec2f point, bool side) {
     this->point = point;
 }
 
+/******************************************/
+/********** STRUCTURE: WALL INFO **********/
+/******************************************/
+
+WallInfo::WallInfo() {
+    this->line = LineEquation();
+    this->color = { 0xFF, 0xFF, 0xFF };
+}
+WallInfo::WallInfo(LineEquation line, SDL_Color color) {
+    this->line = line;
+    this->color = color;
+}
+
 /**********************************/
 /********** CLASS: PLANE **********/
 /**********************************/
@@ -52,12 +63,10 @@ Plane::Plane(int width, int height) {
     this->width = width;
     this->height = height;
     this->tiles = new int[width * height];
-    this->geometry = std::map<int, std::vector<LineEquation>>();
-    this->lineColors = std::map<int, SDL_Color>();
+    this->walls = std::map<int, std::vector<WallInfo>>();
 }
 Plane::Plane(const std::string& file) {
-    this->geometry = std::map<int, std::vector<LineEquation>>();
-    this->lineColors = std::map<int, SDL_Color>();
+    this->walls = std::map<int, std::vector<WallInfo>>();
     this->load(file);
 }
 Plane::~Plane() {
@@ -72,7 +81,7 @@ void Plane::setAllTiles(int tileId) {
 bool Plane::inBounds(int x, int y) const {
     return (x > -1 && x < this->width) && (y > -1 && y < this->height);
 }
-int Plane::getTile(int x, int y) const {
+int Plane::getTileData(int x, int y) const {
     if(inBounds(x, y))
         return this->tiles[this->posToDataIndex(x, y)];
     return -1;
@@ -90,138 +99,236 @@ int Plane::maxData() const {
     }
     return max;
 }
-int Plane::setTile(int x, int y, int tileId) {
+int Plane::setTileData(int x, int y, int tileData) {
     if(this->inBounds(x, y)) {
-        this->tiles[this->posToDataIndex(x, y)] = tileId;
+        this->tiles[this->posToDataIndex(x, y)] = tileData;
         return Plane::E_G_CLEAR;
     }
     return Plane::E_G_TILE_NOT_FOUND;
 }
-int Plane::setLine(int tileId, int lineId, float slope, float intercept, float domainStart, float domainEnd) {
-    for(auto& ve : this->geometry)
-        if(ve.first == tileId)
-            for(LineEquation& le : ve.second)
-                if(le.id == lineId) {
-                    le.slope = slope;
-                    le.intercept = intercept;
-                    le.domainStart = domainStart == -1 ? le.domainStart : clamp(domainStart, 0, 1);
-                    le.domainEnd = domainEnd == -1 ? le.domainEnd : clamp(domainEnd, 0, 1);
-                    return Plane::E_G_CLEAR;
-                }
-    return Plane::E_G_TILE_NOT_FOUND;
+void Plane::setTileWall(int tileData, int wallIndex, LineEquation line, SDL_Color color) {
+    // Ensure wall for specified tile exists
+    if(this->walls.count(tileData) == 0)
+        this->walls.insert(std::pair<int, std::vector<WallInfo>>(
+            tileData,
+            std::vector<WallInfo>()
+        ));
+    // Additionaly ensure that specified wall exists, if vector is empty is has no size
+    if(this->walls.at(tileData).empty() || wallIndex < 0 || wallIndex > this->walls.at(tileData).size() - 1) {
+        wallIndex = this->walls.at(tileData).size();
+        this->walls.at(tileData).push_back(WallInfo());
+    }
+    // Finally set the well-ensured target
+    WallInfo* ptr = &this->walls.at(tileData).at(wallIndex);
+    ptr->line = line;
+    ptr->color = color;
 }
+
 int_pair Plane::load(const std::string& file) {
     std::ifstream stream(file);
-    int line = 1;
+    int ln = 0;
     if(!stream.good()) {
-        return int_pair(line, Plane::E_PF_FAILED_TO_LOAD);
+        return int_pair(ln, Plane::E_PF_FAILED_TO_LOAD);
     }
 
-    const std::string SEMICOLON = ";";
-    std::string bf0, bf1, bf2, bf3; // Buffers for taking input
-    // Read world dimensions
-    stream >> bf0; // Width
-    stream >> bf1; // Height
-    stream >> bf2; // Semicolon
+    std::string fileLine;
+    int wdh = -1; // World data height (starting from top)
+    while(std::getline(stream, fileLine)) {
+        ln++;
 
-    if(bf2 != SEMICOLON)
-        return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
-    if(!isNumber(bf0) || !isNumber(bf1))
-        return int_pair(line, Plane::E_PF_INVALID_DIMENSIONS);
-    this->width = (int)std::stof(bf0);
-    this->height = (int)std::stof(bf1);
-    this->tiles = new int[this->width * this->height];
-
-    // Read world tiles data
-    for(int y = this->height - 1; y != -1; y--) {
-        line++;
-        for(int x = 0; x != this->width; x++) {
-            stream >> bf0;
-            if(!isNumber(bf0))
-                return int_pair(line, Plane::E_PF_INVALID_TILE_DATA);
-            this->setTile(x, y, (int)std::stof(bf0));
+        // Extract space-separated arguments
+        std::vector<std::string> args;
+        std::string current = "";
+        for(const char& ch : fileLine) {
+            if(ch == ' ') {
+                if(!current.empty()) // Omit fancy spaces
+                    args.push_back(current);
+                current = "";
+            }
+            else current += ch;
         }
-        stream >> bf0;
-        if(bf0 != SEMICOLON)
-            return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
+        if(current != "") // Include the last one
+            args.push_back(current);
+        // Quit if blank line is encountered
+        if(args.size() == 0)
+            continue;
+        // Interpret the arguments as a single-letter command
+        char cmd = args.at(0)[0];
+        switch(cmd) {
+            // Single line comment
+            case '#':
+                continue;
+            // Define world size
+            case 's':
+                if(args.size() != 3)
+                    return int_pair(ln, Plane::E_PF_INVALID_ARGUMENTS_COUNT);
+                else if(!isFloat(args.at(1)) || !isFloat(args.at(2)))
+                    return int_pair(ln, Plane::E_PF_UNKNOWN_NUMBER_FORMAT);
+                this->width = (int)std::stof(args.at(1));
+                this->height = (int)std::stof(args.at(2));
+                wdh = this->height - 1;
+                this->tiles = new int[this->width * this->height];
+                break;
+            // Define next world data height (counting from top)
+            case 'w':
+                if(wdh == -1)
+                    return int_pair(ln, Plane::E_PF_OPERATION_NOT_AVAILABLE);
+                if(args.size() != this->width + 1)
+                    return int_pair(ln, Plane::E_PF_INVALID_ARGUMENTS_COUNT);
+                for(int x = 0; x < this->width; x++) {
+                    if(!isFloat(args.at(1 + x)))
+                        return int_pair(ln, Plane::E_PF_UNKNOWN_NUMBER_FORMAT);
+                    this->setTileData(x, wdh, (int)std::stof(args.at(1 + x)));
+                }
+                wdh--;
+                break;
+            // Define properties of a tile with specified data
+            case 't':
+                if(args.size() != 12)
+                    return int_pair(ln, Plane::E_PF_INVALID_ARGUMENTS_COUNT);
+                else if(!(
+                    isFloat(args.at(1))  && isFloat(args.at(3))  && isFloat(args.at(4))  &&
+                    isFloat(args.at(6))  && isFloat(args.at(7))  && isFloat(args.at(9))  &&
+                    isFloat(args.at(10)) && isFloat(args.at(11))
+                )) return int_pair(ln, Plane::E_PF_UNKNOWN_NUMBER_FORMAT);
+
+                this->setTileWall(
+                    (int)std::stof(args.at(1)),
+                    -1, // Enforce new wall entry creation
+                    LineEquation(
+                        std::stof(args.at(3)),
+                        std::stof(args.at(4)),
+                        std::stof(args.at(6)),
+                        std::stof(args.at(7))
+                    ),
+                    {
+                        (Uint8)std::stof(args.at(9)),
+                        (Uint8)std::stof(args.at(10)),
+                        (Uint8)std::stof(args.at(11))
+                    }
+                );
+                break;
+            default:
+                return int_pair(ln, Plane::E_PF_OPERATION_NOT_AVAILABLE);
+                break;
+        }
     }
 
-    // Read line equations (aka wall geometries)
-    while(true) {
-        line++;
-        stream >> bf0; // Tile (aka wall) id
-        if(bf0 == SEMICOLON) // Two semicolons in a row indicate termination
-            break;
-        stream >> bf1; // Line identification number
-        stream >> bf2; // Line slope
-        stream >> bf3; // Line intercept
-        
-        // Load tileId, lineId, slope and intercept
-        if(!isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2) || !isNumber(bf3)) 
-            return int_pair(line, Plane::E_PF_INVALID_LINE_DATA);
-        int tileId = (int)std::stof(bf0);
-        int lineId = (int)std::stof(bf1);
-        float slope = std::stof(bf2);
-        float intercept = std::stof(bf3);
-
-        // Load domain start and end values
-        stream >> bf0;
-        stream >> bf1;
-        if(!isNumber(bf0) || !isNumber(bf1))
-            return int_pair(line, Plane::E_PF_INVALID_LINE_DATA);
-        float domainStart = std::stof(bf0);
-        float domainEnd = std::stof(bf1);
-
-        // Create vector entry if it does not exist
-        if(this->geometry.count(tileId) == 0)
-            this->geometry.insert(std::pair<int, std::vector<LineEquation>>(
-                tileId, std::vector<LineEquation>()
-            ));
-        // Add a new line equation for a specified tile id
-        this->geometry.at(tileId).push_back(
-            LineEquation(lineId, slope, intercept, domainStart, domainEnd)
-        );
-        // Ensure semicolon at the end
-        stream >> bf0;
-        if(bf0 != SEMICOLON)
-            return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
-    }
-
-    // Read line colors (very similar to the previous one above)
-    while(true) {
-        line++;
-        stream >> bf0; // Line id
-        stream >> bf1; // Red channel
-        stream >> bf2; // Green channel
-        stream >> bf3; // Blue channel
-
-        if(bf0 == SEMICOLON)
-            break;
-        else if(!isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2) || !isNumber(bf3))
-            return int_pair(line, Plane::E_PF_INVALID_COLOR_DATA);
-        int lineId = (int)std::stof(bf0);
-        this->lineColors.insert(std::pair<int, SDL_Color>(
-            lineId, { (Uint8)std::stof(bf1), (Uint8)std::stof(bf2), (Uint8)std::stof(bf3), 255 }
-        ));
-        stream >> bf0;
-        if(bf0 != SEMICOLON)
-            return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
-    }
+    //std::cout << this->width << ", " << this->height << std::endl;
+    // for(int a = this->width - 1; a != -1; a--) {
+    //     for(int b = 0; b < this->height; b++)
+    //         std::cout << this->getTileData(b, a) << " ";
+    //     std::cout << "\n";
+    // }
 
     stream.close();
-    return int_pair(line, Plane::E_PF_CLEAR);
+    return int_pair(ln, Plane::E_PF_CLEAR);
 }
-SDL_Color Plane::getLineColor(int lineId) const {
-    for(const auto& lc : this->lineColors)
-        if(lc.first == lineId)
-            return lc.second;
-    return { 0, 0, 0, 0 };
-}
-std::vector<LineEquation> Plane::getLines(int id) const {
-    for(const auto& ve : this->geometry)
-        if(ve.first == id)
-            return ve.second;
-    return std::vector<LineEquation>();
+// int_pair Plane::load(const std::string& file) {
+//     std::ifstream stream(file);
+//     int line = 1;
+//     if(!stream.good()) {
+//         return int_pair(line, Plane::E_PF_FAILED_TO_LOAD);
+//     }
+
+//     const std::string SEMICOLON = ";";
+//     std::string bf0, bf1, bf2, bf3; // Buffers for taking input
+//     // Read world dimensions
+//     stream >> bf0; // Width
+//     stream >> bf1; // Height
+//     stream >> bf2; // Semicolon
+
+//     if(bf2 != SEMICOLON)
+//         return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
+//     if(!isFloat(bf0) || !isFloat(bf1))
+//         return int_pair(line, Plane::E_PF_INVALID_DIMENSIONS);
+//     this->width = (int)std::stof(bf0);
+//     this->height = (int)std::stof(bf1);
+//     this->tiles = new int[this->width * this->height];
+
+//     // Read world tiles data
+//     for(int y = this->height - 1; y != -1; y--) {
+//         line++;
+//         for(int x = 0; x != this->width; x++) {
+//             stream >> bf0;
+//             if(!isFloat(bf0))
+//                 return int_pair(line, Plane::E_PF_INVALID_TILE_DATA);
+//             this->setTile(x, y, (int)std::stof(bf0));
+//         }
+//         stream >> bf0;
+//         if(bf0 != SEMICOLON)
+//             return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
+//     }
+
+//     // Read line equations (aka wall geometries)
+//     while(true) {
+//         line++;
+//         stream >> bf0; // Tile (aka wall) id
+//         if(bf0 == SEMICOLON) // Two semicolons in a row indicate termination
+//             break;
+//         stream >> bf1; // Line identification number
+//         stream >> bf2; // Line slope
+//         stream >> bf3; // Line intercept
+        
+//         // Load tileId, lineId, slope and intercept
+//         if(!isFloat(bf0) || !isFloat(bf1) || !isFloat(bf2) || !isFloat(bf3)) 
+//             return int_pair(line, Plane::E_PF_INVALID_LINE_DATA);
+//         int tileId = (int)std::stof(bf0);
+//         int lineId = (int)std::stof(bf1);
+//         float slope = std::stof(bf2);
+//         float intercept = std::stof(bf3);
+
+//         // Load domain start and end values
+//         stream >> bf0;
+//         stream >> bf1;
+//         if(!isFloat(bf0) || !isFloat(bf1))
+//             return int_pair(line, Plane::E_PF_INVALID_LINE_DATA);
+//         float domainStart = std::stof(bf0);
+//         float domainEnd = std::stof(bf1);
+
+//         // Create vector entry if it does not exist
+//         if(this->geometry.count(tileId) == 0)
+//             this->geometry.insert(std::pair<int, std::vector<LineEquation>>(
+//                 tileId, std::vector<LineEquation>()
+//             ));
+//         // Add a new line equation for a specified tile id
+//         this->geometry.at(tileId).push_back(
+//             LineEquation(lineId, slope, intercept, domainStart, domainEnd)
+//         );
+//         // Ensure semicolon at the end
+//         stream >> bf0;
+//         if(bf0 != SEMICOLON)
+//             return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
+//     }
+
+//     // Read line colors (very similar to the previous one above)
+//     while(true) {
+//         line++;
+//         stream >> bf0; // Line id
+//         stream >> bf1; // Red channel
+//         stream >> bf2; // Green channel
+//         stream >> bf3; // Blue channel
+
+//         if(bf0 == SEMICOLON)
+//             break;
+//         else if(!isFloat(bf0) || !isFloat(bf1) || !isFloat(bf2) || !isFloat(bf3))
+//             return int_pair(line, Plane::E_PF_INVALID_COLOR_DATA);
+//         int lineId = (int)std::stof(bf0);
+//         this->lineColors.insert(std::pair<int, SDL_Color>(
+//             lineId, { (Uint8)std::stof(bf1), (Uint8)std::stof(bf2), (Uint8)std::stof(bf3), 255 }
+//         ));
+//         stream >> bf0;
+//         if(bf0 != SEMICOLON)
+//             return int_pair(line, Plane::E_PF_MISSING_SEMICOLON);
+//     }
+
+//     stream.close();
+//     return int_pair(line, Plane::E_PF_CLEAR);
+// }
+std::vector<WallInfo> Plane::getTileWalls(int tileData) const {
+    if(this->walls.count(tileData) == 0)
+        return std::vector<WallInfo>();
+    return this->walls.at(tileData);
 }
 
 /******************************************/
@@ -282,7 +389,7 @@ RayHitInfo DDA_Algorithm::next() {
         return RayHitInfo();
     }
     // If tile data is not zero, then ray hit this tile
-    int tileData = this->plane->getTile(planePosX, planePosY);
+    int tileData = this->plane->getTileData(planePosX, planePosY);
     if(tileData != 0) {
         float distance = (rayFlag == DDA_Algorithm::RF_SIDE) ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
         rayFlag |= DDA_Algorithm::RF_HIT;

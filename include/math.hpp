@@ -4,10 +4,11 @@
 
 #include <vector>
 #include <string>
+#include <sstream>
 #include <cmath>
 
 // Checks if number is integer (1, 2, ...) or float (1.2, 3.14, ...)
-bool isNumber(const std::string& str);
+bool isFloat(const std::string& str);
 int digitCount(int n);
 float clamp(float value, float min, float max);
 
