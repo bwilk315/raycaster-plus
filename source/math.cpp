@@ -23,6 +23,9 @@ bool isNumber(const std::string& str) {
         } else if(ch == '-') {
             if(i != 0)
                 return false;
+        // SKIP FOR NOW
+        } else if(ch == '+' || ch == 'e') {
+            
         // Everything else
         } else {
             return false;

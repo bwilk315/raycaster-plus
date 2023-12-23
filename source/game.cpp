@@ -10,10 +10,12 @@ LineEquation::LineEquation() {
     this->slope = 0;
     this->intercept = 0;
 }
-LineEquation::LineEquation(int id, float slope, float intercept) {
+LineEquation::LineEquation(int id, float slope, float intercept, float domainStart, float domainEnd) {
     this->id = id;
     this->slope = slope;
     this->intercept = intercept;
+    this->domainStart = domainStart;
+    this->domainEnd = domainEnd;
 }
 vec2f LineEquation::intersection(const LineEquation& other) const {
     float x = (this->intercept - other.intercept) / (other.slope - this->slope);
@@ -28,13 +30,11 @@ RayHitInfo::RayHitInfo() {
     this->distance = -1;
     this->tile = vec2i(0, 0);
     this->point = vec2f::ZERO;
-    this->side = false;
 }
 RayHitInfo::RayHitInfo(float distance, vec2i tile, vec2f point, bool side) {
     this->distance = distance;
     this->tile = tile;
     this->point = point;
-    this->side = side;
 }
 
 /******************************************/
@@ -120,15 +120,17 @@ int Plane::setTile(int x, int y, int tileId) {
     }
     return Plane::E_G_TILE_NOT_FOUND;
 }
-int Plane::setLine(int tileId, int lineId, float slope, float intercept) {
+int Plane::setLine(int tileId, int lineId, float slope, float intercept, float domainStart, float domainEnd) {
     for(auto& ve : this->geometry)
-        if(ve.first == tileId) {
-            if(lineId < 0 || lineId > ve.second.size() - 1)
-                return Plane::E_G_LINE_NOT_FOUND;
-            ve.second.at(lineId).slope = slope;
-            ve.second.at(lineId).intercept = intercept;
-            return Plane::E_G_CLEAR;
-        }
+        if(ve.first == tileId)
+            for(LineEquation& le : ve.second)
+                if(le.id == lineId) {
+                    le.slope = slope;
+                    le.intercept = intercept;
+                    le.domainStart = domainStart == -1 ? le.domainStart : clamp(domainStart, 0, 1);
+                    le.domainEnd = domainEnd == -1 ? le.domainEnd : clamp(domainEnd, 0, 1);
+                    return Plane::E_G_CLEAR;
+                }
     return Plane::E_G_TILE_NOT_FOUND;
 }
 int_pair Plane::load(const std::string& file) {
@@ -177,9 +179,22 @@ int_pair Plane::load(const std::string& file) {
         stream >> bf2; // Line slope
         stream >> bf3; // Line intercept
         
+        // Load tileId, lineId, slope and intercept
         if(!isNumber(bf0) || !isNumber(bf1) || !isNumber(bf2) || !isNumber(bf3)) 
             return int_pair(line, Plane::E_PF_INVALID_LINE_DATA);
         int tileId = (int)std::stof(bf0);
+        int lineId = (int)std::stof(bf1);
+        float slope = std::stof(bf2);
+        float intercept = std::stof(bf3);
+
+        // Load domain start and end values
+        stream >> bf0;
+        stream >> bf1;
+        if(!isNumber(bf0) || !isNumber(bf1))
+            return int_pair(line, Plane::E_PF_INVALID_LINE_DATA);
+        float domainStart = std::stof(bf0);
+        float domainEnd = std::stof(bf1);
+
         // Create vector entry if it does not exist
         if(this->geometry.count(tileId) == 0)
             this->geometry.insert(std::pair<int, std::vector<LineEquation>>(
@@ -187,7 +202,7 @@ int_pair Plane::load(const std::string& file) {
             ));
         // Add a new line equation for a specified tile id
         this->geometry.at(tileId).push_back(
-            LineEquation((int)std::stof(bf1), std::stof(bf2), std::stof(bf3))
+            LineEquation(lineId, slope, intercept, domainStart, domainEnd)
         );
         // Ensure semicolon at the end
         stream >> bf0;
@@ -236,68 +251,74 @@ std::vector<LineEquation> Plane::getLines(int id) const {
 /********** CLASS: DDA ALGORITHM **********/
 /******************************************/
 
-DDA_Algorithm::DDA_Algorithm(const Plane& plane, int maxTileDist) {
-    this->plane = &plane;
-    this->hits = new RayHitInfo[maxTileDist];
+DDA_Algorithm::DDA_Algorithm(const Plane* plane, int maxTileDist) {
+    this->plane = plane;
     this->maxTileDistSquared = maxTileDist * maxTileDist;
 }
-DDA_Algorithm::~DDA_Algorithm() {
-    if(this->hits != nullptr)
-        delete[] this->hits;
-}
-int DDA_Algorithm::sendRay(vec2f start, vec2f direction) {
-    vec2i mapPos = start.toInt();
-    // Assuming the ray direction vector d is normalized (of length 1), pythagoras way of computing
-    // these distances, e.g. to by unit in x: sqrt(1 + (dY/dX)^2), can be exchanged with much simpler
-    // one: abs(1/dX) (it can be derived manually).
-    float deltaDistX = direction.x == 0 ? 1e30 : std::abs(1 / direction.x);
-    float deltaDistY = direction.y == 0 ? 1e30 : std::abs(1 / direction.y);
-    float sideDistX, sideDistY;
-    int stepX, stepY;
-    // Calculate step and initial sideDist
+void DDA_Algorithm::init(const vec2f& start, const vec2f& direction) {
+    this->start = start;
+    this->direction = direction;
+    this->rayFlag = DDA_Algorithm::RF_CLEAR;
+    this->initialized = true;
+
+    planePosX = (int)start.x;
+    planePosY = (int)start.y;
+    deltaDistX = direction.x == 0 ? 1e30 : std::abs(1 / direction.x);
+    deltaDistY = direction.y == 0 ? 1e30 : std::abs(1 / direction.y);
+    // Set initial distances and stepping direction
     if(direction.x < 0) {
         stepX = -1;
-        sideDistX = (start.x - mapPos.x) * deltaDistX;
+        sideDistX = (start.x - this->planePosX) * deltaDistX;
     } else {
         stepX = 1;
-        sideDistX = (1 + mapPos.x - start.x) * deltaDistX;
+        sideDistX = (1 + this->planePosX - start.x) * deltaDistX;
     }
     if(direction.y < 0) {
         stepY = -1;
-        sideDistY = (start.y - mapPos.y) * deltaDistY;
+        sideDistY = (start.y - this->planePosY) * deltaDistY;
     } else {
         stepY = 1;
-        sideDistY = (1 + mapPos.y - start.y) * deltaDistY;
+        sideDistY = (1 + this->planePosY - start.y) * deltaDistY;
     }
-    // Perform Digital Differential Analysis algorithm
-    bool side = false; // Has he side of a tile (X axis) got hit?
-    int hitCount = 0;
-    while(true) {
-        if(sideDistX < sideDistY) {
-            sideDistX += deltaDistX;
-            mapPos.x += stepX;
-            side = true;
-        } else {
-            sideDistY += deltaDistY;
-            mapPos.y += stepY;
-            side = false;
-        }
-        // Check if the tile is not exceeded the maximum distance
-        int deltaPosX = mapPos.x - start.x;
-        int deltaPosY = mapPos.y - start.y;
-        if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > maxTileDistSquared)
-            break;
-        // Process the hit tile data, register it if possible
-        if(!this->plane->inBounds(mapPos.x, mapPos.y))
-            break;
-        int tileData = this->plane->getTile(mapPos.x, mapPos.y);
-        if(tileData != 0) {
-            // Find the hit point by moving DDA-computed distance along sent ray direction
-            float pointDist = side ? sideDistX - deltaDistX : sideDistY - deltaDistY;
-            this->hits[hitCount++] = { pointDist, mapPos, start + direction * pointDist, side };
-        }
+}
+RayHitInfo DDA_Algorithm::next() {
+    // Step along appropriate axis
+    if(sideDistX < sideDistY) {
+        sideDistX += deltaDistX;
+        planePosX += stepX;
+        rayFlag = DDA_Algorithm::RF_SIDE;
+    } else {
+        sideDistY += deltaDistY;
+        planePosY += stepY;
+        rayFlag = DDA_Algorithm::RF_CLEAR;
     }
-    return hitCount;
+    // Check if hit tile is not exceeding the maximum tile distance
+    int deltaPosX = planePosX - this->start.x;
+    int deltaPosY = planePosY - this->start.y;
+    if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > this->maxTileDistSquared) {
+        rayFlag = DDA_Algorithm::RF_TOO_FAR;
+        return RayHitInfo();
+    }
+    // Check if hit tile is not outside the plane
+    if(!this->plane->inBounds(planePosX, planePosY)) {
+        rayFlag = DDA_Algorithm::RF_OUTSIDE;
+        return RayHitInfo();
+    }
+    // If tile data is not zero, then ray hit this tile
+    int tileData = this->plane->getTile(planePosX, planePosY);
+    if(tileData != 0) {
+        float distance = (rayFlag == DDA_Algorithm::RF_SIDE) ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
+        rayFlag |= DDA_Algorithm::RF_HIT;
+        return RayHitInfo(
+            distance,
+            vec2i(planePosX, planePosY),
+            start + direction * distance,
+            rayFlag & DDA_Algorithm::RF_SIDE
+        );
+    }
+    // This should not trigger but it exists for safety reasons
+    rayFlag = DDA_Algorithm::RF_CLEAR;
+    return RayHitInfo();
 }
 
 /***********************************/

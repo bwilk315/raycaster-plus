@@ -16,9 +16,11 @@ struct LineEquation {
     int id;          // Number indicating properties of a line
     float slope;     // Line growth rate
     float intercept; // Displacement along Y axis
+    float domainStart;
+    float domainEnd;
 
     LineEquation();
-    LineEquation(int id, float slope, float intercept);
+    LineEquation(int id, float slope, float intercept, float domainStart, float domainEnd);
     vec2f intersection(const LineEquation& other) const;
 };
 
@@ -26,7 +28,6 @@ struct RayHitInfo {
     float distance; // Distance traveled by a ray
     vec2i tile;     // Hit tile position
     vec2f point;    // Global point hit by the ray
-    bool side;      // Flag indicating if ray hit the tile from E/W direction
 
     RayHitInfo();
     RayHitInfo(float distance, vec2i tile, vec2f point, bool side);
@@ -90,7 +91,7 @@ class Plane {
         int maxData() const;  // Returns the highest value of a tile used.
         int setTile(int x, int y, int tileId);
         // Sets properties of line with id <lineId> belonging to a tile with id <tileId>
-        int setLine(int tileId, int lineId, float slope, float height);
+        int setLine(int tileId, int lineId, float slope, float intercept, float domainStart = -1, float domainEnd = -1);
         // Loads plane tiles data from a specified file
         int_pair load(const std::string& file);
         SDL_Color getLineColor(int lineId) const;
@@ -98,21 +99,37 @@ class Plane {
         std::vector<LineEquation> getLines(int tileId) const;
 };
 
+/* Class providing DDA algorithm in a stepping-like way. First initialize it using <init> function,
+ * then use <next> function to perform one DDA step. */
 class DDA_Algorithm {
     private:
-        int maxTileDistSquared; // Only square is useful
+        int maxTileDistSquared; // For later comparisons without square root
         const Plane* plane;
 
-    public:
-        // Array filled by <sendRay()> with information about hit tiles which stop the algorithm.
-        RayHitInfo* hits = nullptr;
+        bool initialized;
+        int stepX, stepY;             // Direction of a ray stepping
+        int planePosX, planePosY;     // Position of a tile the ray is currently in
+        float deltaDistX, deltaDistY; // Distances needed to move by one unit in both axes
+        float sideDistX, sideDistY;   // Currently-traveled distance by moving one unit in both axes
+        vec2f start;     // Ray starting point
+        vec2f direction; // Ray stepping direction (normalized)
 
-        DDA_Algorithm(const Plane& plane, int maxTileDist);
-        ~DDA_Algorithm();
-        /* Performs the algorithm for finding plane tiles which a ray walking from point <start>
-         * in direction <direction> touch, amount of touched tiles is returned, remember that ray
-         * ignores tiles with data 0. Information about next hit tiles is stored in <hits> array. */
-        int sendRay(vec2f start, vec2f direction);
+    public:
+        int rayFlag;
+        // Ray flags telling various things about a ray
+        enum {
+            RF_CLEAR    = 0,
+            RF_HIT      = 1 << 1, // Informs that hit occurred
+            RF_SIDE     = 1 << 2, // Indicates that ray hit the tile from east/west direction
+            RF_TOO_FAR  = 1 << 3, // Set if a tile hit by ray exceeded the maximum tile distance
+            RF_OUTSIDE  = 1 << 4  // Tells that ray hit a tile which is out of the plane bounds
+        };
+
+        DDA_Algorithm(const Plane* plane, int maxTileDist);
+        /* Prepares things needed to perform the algorithm from point <start> in direction <direction>. */
+        void init(const vec2f& start, const vec2f& direction);
+        /* Performs one step resulting in hitting some tile, information about the hit is returned. */
+        RayHitInfo next();
 };
 
 class Camera {
