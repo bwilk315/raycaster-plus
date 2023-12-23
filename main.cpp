@@ -1,9 +1,8 @@
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 #include <iostream>
 #include <chrono>
-#include <set>
 #include <SDL2/SDL.h>
 #include "include/math.hpp"
 #include "include/print.hpp"
@@ -12,11 +11,11 @@
 
 /********** RAYCASTER CONFIGURATION **********/
 // Video settings
-#define SCREEN_WIDTH 1200
-#define SCREEN_HEIGHT 700
+#define SCREEN_WIDTH 1280
+#define SCREEN_HEIGHT 800
 #define LOOP_FPS 60
 #define COLS_PER_RAY 4
-#define MAX_TILE_DIST 30
+#define MAX_TILE_DIST 10
 // Player settings
 #define MOVE_SPEED 3
 #define FOV_ANGLE M_PI / 2
@@ -76,7 +75,7 @@ int main() {
             }
         }
 
-        if(false) {
+        if(1) {
             /** THE IDEA BELOW CAN BE USED IN THE FURUTRE TO DO SPRITE STUFF **/
             // Plane is always looking at the player, appears flat
             vec2f ort = camera.getDirection().orthogonal();
@@ -123,123 +122,116 @@ int main() {
         if(keyStates[SDL_SCANCODE_LEFT]) {
             camera.changeDirection(-1 * TURN_SPEED * elapsedTime);
         }
+
         // Draw the current frame
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
         for(int column = 0; column < SCREEN_WIDTH; column += COLS_PER_RAY) {
             // Position of the ray on the camera plane, from -1 (left) to 1 (right)
             float cameraX = 2 * column / (float)SCREEN_WIDTH - 1;
-            // Not normalizing the ray direction allows for later use of "side-delta dist" trick proposed by
-            // the lodev, personally I do not understand it fully so I decided to use point-line distance instead.
             vec2f rayDir = (camDir + planeDir * cameraX).normalized();
-
             // Find line equation describing the ray walk
             LineEquation rayLine;
-            rayLine.slope = rayDir.x == 0 ? 1e30 : (rayDir.y / rayDir.x); // constant
-
-            // Send a ray, which will collect information about tiles it met during stepping,
-            // then process gathered information.
+            rayLine.slope = (rayDir.x == 0) ? (1e30) : (rayDir.y / rayDir.x); // Stays constant during the frame
+            
+            // Perform the ray stepping, at each step hit tile is examined and if some wall is hit,
+            // its information is stored in a dedicated structure. 
             dda.init(camPos, rayDir);
-            WallStripeInfo wsi;
+            bool wasWallHit = false;
+            int wallTileData;   // Number indicating tile properties
+            int wallLineId;     // This specifies line properties instead
+            float wallDistance; // Distance from a wall
+            vec2f wallNormal;   // Vector telling in which direction a wall is facing
             while(true) {
                 RayHitInfo info = dda.next();
+                // Exit the loop in appropriate moment
+                if( (wasWallHit) ||
+                    (dda.rayFlag & DDA_Algorithm::RF_TOO_FAR) ||
+                    (dda.rayFlag & DDA_Algorithm::RF_OUTSIDE) ) {
+                    break;
+                // If a ray touched an air tile (with data of 0), skip
+                } else if(!(dda.rayFlag & DDA_Algorithm::RF_HIT))
+                    continue;
+
                 int tileData = world.getTile(info.tile.x, info.tile.y);
                 bool fromSide = dda.rayFlag & DDA_Algorithm::RF_SIDE;
-                bool wasHit = false;
-
-                // The closest line equation defines the wall geometry
                 float minLineDist = 1e30;
                 for(const LineEquation& line : world.getLines(tileData)) {
+                    // It will not be seen anyway
                     if(line.domainStart == line.domainEnd)
-                        continue; // It wont be seen anyway
-            
-                    // Line is defined, find the intersection point with the ray line equation,
-                    // notice that Y-intercepts of both equations are relative to the hit tile
-                    // integer position.
-                    // Finally, having both equations, obtain intersection point, then make it global
-                    // and compute the point-line distance being the projected distance.
-
-                    // Update the ray line's intercept
-                    float rayIntX = 0; // Camera intercepts in both axes, IntX moves the line equation
-                    float rayIntY = 0; // horizontally, and IntY vertically.
+                        continue; 
+                    // Update the ray line intercept
+                    float rayIntX; // Camera intercepts in both axes, rayIntX moves the line equation
+                    float rayIntY; // horizontally, and ray IntY vertically.
                     if(fromSide) {
                         rayIntY = info.point.y - (int)info.point.y;
-                        if(rayDir.x < 0)
-                            rayIntX = 1;
+                        rayIntX = (rayDir.x < 0) ? (1) : (0);
                     } else {
                         rayIntX = info.point.x - (int)info.point.x;
-                        if(rayDir.y < 0)
-                            rayIntY = 1;
+                        rayIntY = (rayDir.y < 0) ? (1) : (0);
                     }
                     rayLine.intercept = rayIntY - rayLine.slope * rayIntX; // Total intercept
-
+                    // Find intersection point of line defining wall geometry and the ray line
                     vec2f inter = line.intersection(rayLine);
                     if((inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) ||
                        (inter.x < line.domainStart || inter.x > line.domainEnd)) {
-                        continue; // Skip wall which is not hit
+                        // Intersection point is out of tile or domain bounds, skip it
+                        continue;
                     } else {
+                        // Intersection point is defined in specified bounds, process it
                         vec2f tilePos = vec2f(
                             ensureInteger(info.point.x), // Ensuring integers prevents them from flipping suddenly,
                             ensureInteger(info.point.y)  // for example: it makes 5.9999 -> 6 and 6.0001 -> 6.
                         );
-                        tilePos.x -= (fromSide && rayDir.x < 0) ? (1) : (0);
+                        tilePos.x -= ( fromSide && rayDir.x < 0) ? (1) : (0);
                         tilePos.y -= (!fromSide && rayDir.y < 0) ? (1) : (0);
-                        float dist = linePointDist(camera, tilePos + inter);
-                        if(dist < minLineDist) {
+                        float pointDist = linePointDist(camera, tilePos + inter);
+                        // The closest line equation defines the wall geometry
+                        if(pointDist < minLineDist) {
                             // Find normal vector of the hit wall
                             vec2f normal = (vec2f::RIGHT).rotate(-1 * atanf(1 / line.slope * -1));
                             if(line.slope < 0)
                                 normal = normal.scale(-1); // Make it consistent
-                            
-                            wsi.tileId = tileData;
-                            wsi.lineId = line.id;
-                            wsi.distance = dist;
-                            wsi.normal = normal;
-                            minLineDist = dist;
+                            // Save (for now) the nearest wall information
+                            wallTileData = tileData;
+                            wallLineId = line.id;
+                            wallDistance = pointDist;
+                            wallNormal = normal;
+                            minLineDist = pointDist;
                         }
-                        wasHit = true;
+                        wasWallHit = true;
                     }
                 }
-                if( (wasHit) ||
-                    (dda.rayFlag & DDA_Algorithm::RF_TOO_FAR) ||
-                    (dda.rayFlag & DDA_Algorithm::RF_OUTSIDE) ) {
-                    break;
-                }
             }
+            if(!wasWallHit) continue; // Ray hit nothing
 
-            // DRAW STRIPE
-            // Choose a color for the wall
+            // Draw the wall using information computed above
             SDL_Color color;
-            color = world.getLineColor(wsi.lineId);
-            
-            // Apply simple normal-based brightness if possible, otherwise just side-based
-            if(wsi.tileId != 5) {  // TEMPORARY CONDITION
-                float bn = -1 * wsi.normal.dot(sunDir);
+            color = world.getLineColor(wallLineId);
+            if(wallTileData != 5) {  // This condition is temporary, it turns of shading for "sprite"
+                // Apply simple normal-based shading
+                float bn = -1 * wallNormal.dot(sunDir);
                 color.r *= bn;
                 color.g *= bn;
                 color.b *= bn;
             }
             SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
-
             // Display the ray by drawing an appropriate vertical strip, scaling is applied in
-            // form of aspectRatio (to make everything have the same size across all resolutions),
+            // form of aspect ratio (to make everything have the same size across all resolutions),
             // and camera plane length (to make squares look always like squares).
             float scale = (1 / aspectRatio) * (1 / (2 * camera.getPlane().magnitude()));
-            int lineHeight = (SCREEN_HEIGHT / wsi.distance) * scale;
+            int lineHeight = (SCREEN_HEIGHT / wallDistance) * scale;
             int drawStart = SCREEN_HEIGHT / 2 - lineHeight / 2;
             int drawEnd = SCREEN_HEIGHT / 2 + lineHeight / 2;
             drawStart = drawStart < 0 ? 0 : drawStart;
             drawEnd = drawEnd >= SCREEN_HEIGHT ? (SCREEN_HEIGHT - 1) : drawEnd;
-            for(int i = 0; i < COLS_PER_RAY; i++) {
+            for(int i = 0; i < COLS_PER_RAY; i++) // Take columns per row into account
                 SDL_RenderDrawLine(renderer, column + i, drawStart, column + i, drawEnd);
-            }
 
             #ifdef DEBUG_MODE
-            // This section is for debugging-purposes only
             if(column == SCREEN_WIDTH / 2) {
-                //system("clear");
-                //printf("frame time: %f\n", elapsedTime);
-                //printVector(wall.normal);
+                system("clear");
+                std::cout << "frame time: " << elapsedTime << std::endl;
                 // Draw a center cross with color being in contrast to the detected one
                 color.r ^= 0xFFFFFF;
                 color.g ^= 0xFFFFFF;

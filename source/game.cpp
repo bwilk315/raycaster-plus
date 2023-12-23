@@ -37,29 +37,6 @@ RayHitInfo::RayHitInfo(float distance, vec2i tile, vec2f point, bool side) {
     this->point = point;
 }
 
-/******************************************/
-/********** STRUCTURE: WALL INFO **********/
-/******************************************/
-
-WallStripeInfo::WallStripeInfo() {
-    this->tileId = -1;
-    this->lineId = -1;
-    this->distance = -1;
-    this->normal = vec2f::ZERO;
-}
-WallStripeInfo::WallStripeInfo(int tileId, int lineId, float distance, vec2f normal) {
-    this->tileId = tileId;
-    this->lineId = lineId;
-    this->distance = distance;
-    this->normal = normal;
-}
-bool WallStripeInfo::operator<(const WallStripeInfo& other) const {
-    return this->distance < other.distance;
-}
-bool WallStripeInfo::operator>(const WallStripeInfo& other) const {
-    return this->distance > other.distance;
-}
-
 /**********************************/
 /********** CLASS: PLANE **********/
 /**********************************/

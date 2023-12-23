@@ -33,19 +33,6 @@ struct RayHitInfo {
     RayHitInfo(float distance, vec2i tile, vec2f point, bool side);
 };
 
-/* Describes properties of vertical line being a part of some planar wall */
-struct WallStripeInfo {
-    int tileId;     // Number indicating tile properties
-    int lineId;     // This specifies line properties instead
-    float distance; // Distance from a wall
-    vec2f normal;   // Vector telling in which direction a wall is facing
-
-    WallStripeInfo();
-    WallStripeInfo(int tileId, int lineId, float distance, vec2f normal);
-    bool operator<(const WallStripeInfo& other) const;
-    bool operator>(const WallStripeInfo& other) const;
-};
-
 /* Describes a grid filled with tile data, each having its unique position in two-dimensional
  * cartesian coordinates system. The origin point (0, 0) is located at the bottom-left corner
  * of the grid, X axis grows when moving right, Y axis do so when moving up. */
