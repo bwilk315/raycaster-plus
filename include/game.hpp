@@ -13,6 +13,7 @@
 typedef std::pair<int, int> int_pair;
 
 struct LineEquation {
+    static const float MAX_SLOPE;
     float slope;       // Line growth rate
     float intercept;   // Displacement along Y axis
     float domainStart; // <0; 1>
@@ -106,6 +107,7 @@ class DDA_Algorithm {
         vec2f direction; // Ray stepping direction (normalized)
 
     public:
+        const float MAX_DD = 1e30f; // Maximum delta distance for both axes
         int rayFlag;
         // Ray flags telling various things about a ray
         enum {

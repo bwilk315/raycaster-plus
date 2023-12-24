@@ -1,5 +1,5 @@
 
-//#define DEBUG_MODE
+#define DEBUG_MODE
 
 #include <iostream>
 #include <chrono>
@@ -7,24 +7,29 @@
 #include "include/math.hpp"
 #include "include/print.hpp"
 
-#define EI_TOLERANCE 0.00001f
-
 /********** RAYCASTER CONFIGURATION **********/
 // Video settings
 #define SCREEN_WIDTH 1280 // O(n)
-#define SCREEN_HEIGHT 800 // O(1)
-#define LOOP_FPS 60 // O(n)
-#define COLS_PER_RAY 4 // O(n^2)
-#define MAX_TILE_DIST 10 // O(n^2) (for detailed tiles)
+#define SCREEN_HEIGHT 720 // O(1)
+#define LOOP_FPS 100 // O(n)
+#define COLS_PER_RAY 2 // O(n^2)
+#define MAX_TILE_DIST 20 // O(n^2) (for detailed tiles)
 // Player settings
 #define MOVE_SPEED 3
 #define FOV_ANGLE M_PI * 0.5f
-#define TURN_SPEED M_PI * 0.75f
+#define TURN_SPEED M_PI * 0.04f  // Radians per unit
+#define MOUSE_CONTROLS true
 // World settings
 #define SUN_ANGLE M_PI / 6
 
 int ensureInteger(float n);
 float linePointDist(const Camera& cam, const vec2f& point);
+
+#define EI_TOLERANCE 0.00001f
+
+const int halfWidth = SCREEN_WIDTH / 2;
+const int halfHeight = SCREEN_HEIGHT / 2;
+const float invSqrt2 = 1.0f / sqrtf(2.0f);
 
 int main() {
     /********** SET UP **********/
@@ -42,6 +47,8 @@ int main() {
     SDL_Renderer* renderer;
     std::chrono::time_point<std::chrono::system_clock> tpLastFrame, tpCurrFrame;
     std::chrono::duration<float> durDelta;
+    int frame = 0;
+    int currMouseX;
     bool keyStates[SDL_NUM_SCANCODES];
     bool runGame = true;
 
@@ -49,6 +56,11 @@ int main() {
     SDL_InitSubSystem(SDL_INIT_VIDEO);
     SDL_CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN, &window, &renderer);
     SDL_SetWindowTitle(window, "Raycaster");
+    #if MOUSE_CONTROLS
+    SDL_ShowCursor(SDL_DISABLE);
+    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    SDL_RaiseWindow(window); // focus
+    #endif
     memset(keyStates, false, SDL_NUM_SCANCODES);
     tpLastFrame = std::chrono::system_clock::now();
     
@@ -75,7 +87,8 @@ int main() {
             }
         }
 
-        if(1) {
+        bool spriteBeta = true;
+        if(spriteBeta) {
             /** THE IDEA BELOW CAN BE USED IN THE FURUTRE TO DO SPRITE STUFF **/
             // Plane is always looking at the player, appears flat
             vec2f ort = camera.getDirection().orthogonal();
@@ -105,28 +118,37 @@ int main() {
         vec2f planeDir = camera.getPlane();
         vec2f camPos = camera.getPosition();
 
-        // Keyboard actions
-        if(keyStates[SDL_SCANCODE_ESCAPE]) {
-            runGame = false;
+        // Camera movement
+        float moveInputX = 0;
+        float moveInputY = 0;
+        if(keyStates[SDL_SCANCODE_ESCAPE]) runGame = false;
+        if(keyStates[SDL_SCANCODE_W]) moveInputY += 1;
+        if(keyStates[SDL_SCANCODE_S]) moveInputY += -1;
+        if(keyStates[SDL_SCANCODE_D]) moveInputX += 1;
+        if(keyStates[SDL_SCANCODE_A]) moveInputX += -1;
+        if(moveInputX || moveInputY) {
+            vec2f posChange = camDir.orthogonal() * moveInputX + camDir * moveInputY;
+            camera.changePosition(
+                posChange * MOVE_SPEED * elapsedTime * (moveInputX && moveInputY ? invSqrt2 : 1.0f)
+            );
         }
-        if(keyStates[SDL_SCANCODE_W]) {
-            camera.changePosition(camDir * MOVE_SPEED * elapsedTime);
+
+        // Camera rotation
+        #if MOUSE_CONTROLS
+        SDL_GetMouseState(&currMouseX, NULL);
+        int mouseDeltaX = currMouseX - halfWidth;
+        if(mouseDeltaX != 0) {
+            camera.changeDirection(TURN_SPEED * mouseDeltaX * elapsedTime);
+            SDL_WarpMouseInWindow(window, halfWidth, halfHeight);
         }
-        if(keyStates[SDL_SCANCODE_S]) {
-            camera.changePosition(camDir * -1 * MOVE_SPEED * elapsedTime);
-        }
-        if(keyStates[SDL_SCANCODE_D]) {
-            camera.changePosition(camDir.orthogonal() * MOVE_SPEED * elapsedTime);
-        }
-        if(keyStates[SDL_SCANCODE_A]) {
-            camera.changePosition(camDir.orthogonal() * -1 * MOVE_SPEED * elapsedTime);
-        }
+        #else
         if(keyStates[SDL_SCANCODE_RIGHT]) {
             camera.changeDirection(TURN_SPEED * elapsedTime);
         }
         if(keyStates[SDL_SCANCODE_LEFT]) {
             camera.changeDirection(-1 * TURN_SPEED * elapsedTime);
         }
+        #endif
 
         // Draw the current frame
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -137,7 +159,8 @@ int main() {
             vec2f rayDir = (camDir + planeDir * cameraX).normalized();
             // Find line equation describing the ray walk
             LineEquation rayLine;
-            rayLine.slope = (rayDir.x == 0) ? (1e30) : (rayDir.y / rayDir.x); // Stays constant during the frame
+            // Stays constant during the frame
+            rayLine.slope = (rayDir.x == 0) ? (LineEquation::MAX_SLOPE) : (rayDir.y / rayDir.x);
             
             // Perform the ray stepping, at each step hit tile is examined and if some wall is hit,
             // its information is stored in a dedicated structure. 
@@ -178,7 +201,8 @@ int main() {
                         rayIntY = (rayDir.y < 0) ? (1) : (0);
                     }
                     rayLine.intercept = rayIntY - rayLine.slope * rayIntX; // Total intercept
-                    // Find intersection point of line defining wall geometry and the ray line
+
+                    // Find intersection point of line defining wall geometry and the ray line.
                     vec2f inter = line->intersection(rayLine);
                     if((inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) ||
                        (inter.x < line->domainStart || inter.x > line->domainEnd)) {
@@ -234,14 +258,16 @@ int main() {
                 SDL_RenderDrawLine(renderer, column + i, drawStart, column + i, drawEnd);
 
             #ifdef DEBUG_MODE
-            if(column == SCREEN_WIDTH / 2) {
-                system("clear");
-                std::cout << "frame time: " << elapsedTime << std::endl;
+            if(std::abs(column - SCREEN_WIDTH / 2) < 2) {
+                if(frame % (LOOP_FPS/4) == 0) {
+                    system("clear");
+                    std::cout << "fps: " << roundf(1.0f / elapsedTime) << std::endl;
+                }
                 // Draw a center cross with color being in contrast to the detected one
-                color.r ^= 0xFFFFFF;
-                color.g ^= 0xFFFFFF;
-                color.b ^= 0xFFFFFF;
-                SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
+                wallColor.r ^= 0xFFFFFF;
+                wallColor.g ^= 0xFFFFFF;
+                wallColor.b ^= 0xFFFFFF;
+                SDL_SetRenderDrawColor(renderer, wallColor.r, wallColor.g, wallColor.b, 255);
                 SDL_RenderDrawLine(renderer, column, 0, column, SCREEN_HEIGHT);
             }
             #endif
@@ -249,6 +275,7 @@ int main() {
 
         SDL_RenderPresent(renderer);
         SDL_Delay(frameDurationMs);
+        frame++;
     }
 
     /********** TERMINATE **********/
