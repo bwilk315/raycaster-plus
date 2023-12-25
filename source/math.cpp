@@ -1,94 +1,132 @@
 
 #include "../include/math.hpp"
 
-bool isFloat(const std::string& str) {
-    std::istringstream iss(str);
-    float _;
-    iss >> std::noskipws >> _;
-    return iss.eof() && !iss.fail();
-}
-int digitCount(int n) {
-    int posNum = std::abs(n);
-    int digits = 1;
-    int power = 1;
-    while(true) {
-        power *= 10;
-        if(power > posNum)
-            break;
-        digits++;
+namespace rp {
+    const float EI_TOL = 0.00001f;
+
+    bool isFloat(const string& str) {
+        std::istringstream iss(str);
+        float _;
+        iss >> std::noskipws >> _;
+        return iss.eof() && !iss.fail();
     }
-    if(n < 0) digits++; // Include the minus sign
-    return (n < 0 ? 1 : 0) + digits;
-}
-float clamp(float value, float min, float max) {
-    return value < min ? min : (value > max ? max : value);
-}
+    int digitCount(int n) {
+        int posNum = std::abs(n);
+        int digits = 1;
+        int power = 1;
+        while(true) {
+            power *= 10;
+            if(power > posNum)
+                break;
+            digits++;
+        }
+        if(n < 0) digits++; // Include the minus sign
+        return ((n < 0) ? (1) : (0)) + digits;
+    }
+    int ensureInteger(float n) {
+        // This simple function kills all demons that output integer while it is not a one, for example
+        // take number 4.999999(...), C++ tells me that it is 5, so I evaluate (int)5 and get 4 ... bruh!
+        return ((int)(n + EI_TOL) > (int)n) ? (ceilf(n)) : (floorf(n));
+    }
+    float clamp(float value, float min, float max) {
+        return (value < min) ? (min) : ((value > max) ? (max) : (value));
+    }
 
-vec2i::vec2i() {
-    this->x = 0;
-    this->y = 0;
-}
-vec2i::vec2i(int x, int y) {
-    this->x = x;
-    this->y = y;
-}
-vec2f vec2i::toFloat() const {
-    return vec2f((float)this->x, (float)this->y);
-}
+    /******************************************/
+    /********** STRUCTURE: LINE EQUATION ******/
+    /******************************************/
 
-const vec2f vec2f::ZERO = vec2f(0, 0);
-const vec2f vec2f::UP = vec2f(0, 1);
-const vec2f vec2f::RIGHT = vec2f(1, 0);
-const vec2f vec2f::DOWN = vec2f(0, -1);
-const vec2f vec2f::LEFT = vec2f(-1, 0);
+    const float LineEquation::MAX_SLOPE = 100.0f;
 
-vec2f::vec2f() {
-    this->x = 0;
-    this->y = 0;
-}
-vec2f::vec2f(float x, float y) {
-    this->x = x;
-    this->y = y;
-}
-vec2f vec2f::add(const vec2f& other) const {
-    return vec2f(this->x + other.x, this->y + other.y);
-}
-float vec2f::dot(const vec2f& other) const {
-    return this->x * other.x + this->y * other.y;
-}
-float vec2f::magnitude() const {
-    return sqrtf(this->x * this->x + this->y * this->y);
-}
-vec2f vec2f::normalized() const {
-    return this->scale(1 / this->magnitude());
-}
-vec2f vec2f::orthogonal() const {
-    return vec2f(this->y, -1 * this->x);
-}
-vec2f vec2f::rotate(float radians) const {
-    // Angle is inverted to rotate clockwisely by default
-    float sin = sinf(-1 * radians);
-    float cos = cosf(-1 * radians);
-    return vec2f(
-        cos * this->x - sin * this->y,
-        sin * this->x + cos * this->y
-    );
-}
-vec2f vec2f::scale(float scalar) const {
-    return vec2f(this->x * scalar, this->y * scalar);
-}
-vec2i vec2f::toInt() const {
-    return vec2i((int)this->x, (int)this->y);
-}
-vec2f vec2f::operator+(const vec2f& other) const {
-    return this->add(other);
-}
-vec2f vec2f::operator-(const vec2f& other) const {
-    return this->add(other.scale(-1));
-}
-vec2f vec2f::operator*(const float scalar) const {
-    return this->scale(scalar);
-}
-float vec2f::operator*(const vec2f& other) const {
-    return this->dot(other);
+    LineEquation::LineEquation() {
+        this->slope = 0;
+        this->height = 0;
+        this->domainStart = 0;
+        this->domainEnd = 0;
+    }
+    LineEquation::LineEquation(float slope, float height, float domainStart, float domainEnd) {
+        this->slope = slope;
+        this->height = height;
+        this->domainStart = domainStart;
+        this->domainEnd = domainEnd;
+    }
+    float LineEquation::pointDistance(const Vector2& point) {
+        return std::abs(slope * point.x - point.y + height) / sqrtf(slope * slope + 1);
+    }
+    Vector2 LineEquation::intersection(const LineEquation& other) const {
+        // When current line is very vertical
+        if(this->slope >= LineEquation::MAX_SLOPE)
+            return Vector2(this->height, other.slope * this->height + other.height);
+        // Any other scenario
+        float x = (this->height - other.height) / (other.slope - this->slope);
+        return Vector2(x, this->slope * x + this->height);
+    }
+    Vector2 LineEquation::operator&&(const LineEquation& other) const {
+        return intersection(other);
+    }
+    ostream& operator<<(ostream& stream, const LineEquation& line) {
+        stream << line.slope << " * x + " << line.height;
+        return stream;
+    }
+
+    /*************************************************/
+    /********** STRUCTURE: 2-DIMENSIONAL VECTOR ******/
+    /*************************************************/
+
+    const Vector2 Vector2::ZERO = Vector2(0, 0);
+    const Vector2 Vector2::UP = Vector2(0, 1);
+    const Vector2 Vector2::RIGHT = Vector2(1, 0);
+    const Vector2 Vector2::DOWN = Vector2(0, -1);
+    const Vector2 Vector2::LEFT = Vector2(-1, 0);
+
+    Vector2::Vector2() {
+        this->x = 0;
+        this->y = 0;
+    }
+    Vector2::Vector2(float x, float y) {
+        this->x = x;
+        this->y = y;
+    }
+    float Vector2::dot(const Vector2& other) const {
+        return this->x * other.x + this->y * other.y;
+    }
+    float Vector2::magnitude() const {
+        return sqrtf(this->x * this->x + this->y * this->y);
+    }
+    Vector2 Vector2::add(const Vector2& other) const {
+        return Vector2(this->x + other.x, this->y + other.y);
+    }
+    Vector2 Vector2::normalized() const {
+        return this->scale(1 / this->magnitude());
+    }
+    Vector2 Vector2::orthogonal() const {
+        return Vector2(this->y, -1 * this->x);
+    }
+    Vector2 Vector2::rotate(float radians) const {
+        float sin = sinf(radians);
+        float cos = cosf(radians);
+        return Vector2(
+            cos * this->x - sin * this->y,
+            sin * this->x + cos * this->y
+        );
+    }
+    Vector2 Vector2::scale(float scalar) const {
+        return Vector2(this->x * scalar, this->y * scalar);
+    }
+    float Vector2::operator*(const Vector2& other) const {
+        return this->dot(other);
+    }
+    Vector2 Vector2::operator+(const Vector2& other) const {
+        return this->add(other);
+    }
+    Vector2 Vector2::operator-(const Vector2& other) const {
+        return this->add(other.scale(-1));
+    }
+    Vector2 Vector2::operator*(const float scalar) const {
+        return this->scale(scalar);
+    }
+    ostream& operator<<(ostream& stream, const Vector2& vec) {
+        stream << "[ " << vec.x << " " << vec.y << "]";
+        return stream;
+    }
 }

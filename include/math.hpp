@@ -7,46 +7,62 @@
 #include <sstream>
 #include <cmath>
 
-// Checks if number is integer (1, 2, ...) or float (1.2, 3.14, ...)
-bool isFloat(const std::string& str);
-int digitCount(int n);
-float clamp(float value, float min, float max);
+namespace rp {
+    using ::std::string;
+    using ::std::ostream;
+    
+    extern const float EI_TOL;
 
-class vec2f;
+    class LineEquation;
+    class Vector2;
 
-struct vec2i {
-    int x, y;
+    bool isFloat(const string& str);
+    int digitCount(int n);
+    int ensureInteger(float n);
+    float clamp(float value, float min, float max);
 
-    vec2i();
-    vec2i(int x, int y);
-    vec2f toFloat() const;
-};
+    struct LineEquation {
+        static const float MAX_SLOPE;
 
-class vec2f {
-    public:
-        static const vec2f ZERO;
-        static const vec2f UP;
-        static const vec2f RIGHT;
-        static const vec2f DOWN;
-        static const vec2f LEFT;
+        float slope;
+        float height;
+        float domainStart;
+        float domainEnd;
+
+        LineEquation();
+        LineEquation(float slope, float intercept, float domainStart, float domainEnd);
+        float pointDistance(const Vector2& point);
+        // Having one kinda vertical line, use it as the method host to make it work
+        Vector2 intersection(const LineEquation& other) const;
+        Vector2 operator&&(const LineEquation& other) const;
+    };
+    ostream& operator<<(ostream& stream, const LineEquation& line);
+
+    struct Vector2 {
+        static const Vector2 ZERO;
+        static const Vector2 UP;
+        static const Vector2 RIGHT;
+        static const Vector2 DOWN;
+        static const Vector2 LEFT;
         
         float x, y;
 
-        vec2f();
-        vec2f(float x, float y);
-        vec2f add(const vec2f& other) const;
-        float dot(const vec2f& other) const;
+        Vector2();
+        Vector2(float x, float y);
+        float dot(const Vector2& other) const;
         float magnitude() const;
-        vec2f normalized() const;
-        vec2f orthogonal() const;
-        vec2f rotate(float radians) const; // Clockwise rotation
-        vec2f scale(float scalar) const;
-        vec2i toInt() const;
+        Vector2 add(const Vector2& other) const;
+        Vector2 normalized() const;
+        Vector2 orthogonal() const;
+        Vector2 rotate(float radians) const;
+        Vector2 scale(float scalar) const;
 
-        vec2f operator+(const vec2f& other) const;
-        vec2f operator-(const vec2f& other) const;
-        vec2f operator*(const float scalar) const;
-        float operator*(const vec2f& other) const;
-};
+        float operator*(const Vector2& other) const;
+        Vector2 operator+(const Vector2& other) const;
+        Vector2 operator-(const Vector2& other) const;
+        Vector2 operator*(const float scalar) const;
+    };
+    ostream& operator<<(ostream& stream, const Vector2& vec);
+}
 
 #endif

@@ -4,15 +4,14 @@
 #include <iostream>
 #include <chrono>
 #include <SDL2/SDL.h>
-#include "include/math.hpp"
-#include "include/print.hpp"
+#include "include/engine.hpp"
 
 /********** RAYCASTER CONFIGURATION **********/
 // Video settings
 #define SCREEN_WIDTH 1280 // O(n)
 #define SCREEN_HEIGHT 720 // O(1)
 #define LOOP_FPS 100 // O(n)
-#define COLS_PER_RAY 2 // O(n^2)
+#define COLS_PER_RAY 4 // O(n^2)
 #define MAX_TILE_DIST 20 // O(n^2) (for detailed tiles)
 // Player settings
 #define MOVE_SPEED 3
@@ -22,27 +21,22 @@
 // World settings
 #define SUN_ANGLE M_PI / 6
 
-int ensureInteger(float n);
-float linePointDist(const Camera& cam, const vec2f& point);
-
-#define EI_TOLERANCE 0.00001f
-
 const int halfWidth = SCREEN_WIDTH / 2;
 const int halfHeight = SCREEN_HEIGHT / 2;
 const float invSqrt2 = 1.0f / sqrtf(2.0f);
 
+using namespace rp;
+
 int main() {
     /********** SET UP **********/
-    const vec2f sunDir = vec2f::RIGHT.rotate(-1 * SUN_ANGLE);
+    const Vector2 sunDir = Vector2::RIGHT.rotate(-1 * SUN_ANGLE);
     const float aspectRatio = SCREEN_HEIGHT / (float)SCREEN_WIDTH;
     const int frameDurationMs = 1000 / LOOP_FPS;
     Plane world;
-    int_pair error = world.load("generated.plane");
-    if(error.second == Plane::E_PF_CLEAR) std::cout << "Plane file is correct\n";
-    else std::cout << "Plane file error " << error.second << " at line " << error.first << std::endl;
-
-    Camera camera = Camera(1.5f, 1.5f, FOV_ANGLE, 0);
-    DDA_Algorithm dda = DDA_Algorithm(&world, MAX_TILE_DIST);
+    int_pair error = world.loadFromFile("generated.plane");
+    
+    Camera camera = Camera(Vector2(1.5f, 1.5f), 0, FOV_ANGLE);
+    DDA dda = DDA(&world, MAX_TILE_DIST);
     SDL_Window* window;
     SDL_Renderer* renderer;
     std::chrono::time_point<std::chrono::system_clock> tpLastFrame, tpCurrFrame;
@@ -52,13 +46,19 @@ int main() {
     bool keyStates[SDL_NUM_SCANCODES];
     bool runGame = true;
 
+    // uhuha
+    // Engine engine(SCREEN_WIDTH, SCREEN_HEIGHT);
+    // std::pair<int, int> error = engine.scene.loadFromFile("generated.plane");
+    // if(error.second == Plane::E_CLEAR) std::cout << "Plane file is correct\n";
+    // else std::cout << "Plane file error " << error.second << " at line " << error.first << std::endl;
+
     /********** INITIALIZATION **********/
     SDL_InitSubSystem(SDL_INIT_VIDEO);
     SDL_CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN, &window, &renderer);
     SDL_SetWindowTitle(window, "Raycaster");
     #if MOUSE_CONTROLS
     SDL_ShowCursor(SDL_DISABLE);
-    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    SDL_SetWindowPosition(window, 0, 0);
     SDL_RaiseWindow(window); // focus
     #endif
     memset(keyStates, false, SDL_NUM_SCANCODES);
@@ -87,11 +87,11 @@ int main() {
             }
         }
 
-        bool spriteBeta = true;
+        bool spriteBeta = false;
         if(spriteBeta) {
             /** THE IDEA BELOW CAN BE USED IN THE FURUTRE TO DO SPRITE STUFF **/
             // Plane is always looking at the player, appears flat
-            vec2f ort = camera.getDirection().orthogonal();
+            Vector2 ort = camera.getDirection().orthogonal();
             float slope = ort.y / ort.x;
             float intercept = 0.5f * (1.0f - slope);
             float startX, endX;
@@ -108,15 +108,17 @@ int main() {
             world.setTileWall(
                 6,
                 0,
-                LineEquation(slope, intercept, x1 < x2 ? x1 : x2, x1 > x2 ? x1 : x2),
-                { 128, 128, 128 }
+                Wall(
+                    LineEquation(slope, intercept, x1 < x2 ? x1 : x2, x1 > x2 ? x1 : x2),
+                    { 128, 128, 128 }
+                )
             );
         }
 
         // Save often-used information
-        vec2f camDir = camera.getDirection();
-        vec2f planeDir = camera.getPlane();
-        vec2f camPos = camera.getPosition();
+        Vector2 camDir = camera.getDirection();
+        Vector2 planeDir = camera.getPlane();
+        Vector2 camPos = camera.getPosition();
 
         // Camera movement
         float moveInputX = 0;
@@ -127,7 +129,7 @@ int main() {
         if(keyStates[SDL_SCANCODE_D]) moveInputX += 1;
         if(keyStates[SDL_SCANCODE_A]) moveInputX += -1;
         if(moveInputX || moveInputY) {
-            vec2f posChange = camDir.orthogonal() * moveInputX + camDir * moveInputY;
+            Vector2 posChange = camDir.orthogonal() * moveInputX + camDir * moveInputY;
             camera.changePosition(
                 posChange * MOVE_SPEED * elapsedTime * (moveInputX && moveInputY ? invSqrt2 : 1.0f)
             );
@@ -138,7 +140,7 @@ int main() {
         SDL_GetMouseState(&currMouseX, NULL);
         int mouseDeltaX = currMouseX - halfWidth;
         if(mouseDeltaX != 0) {
-            camera.changeDirection(TURN_SPEED * mouseDeltaX * elapsedTime);
+            camera.changeDirection(-1 * TURN_SPEED * mouseDeltaX * elapsedTime);
             SDL_WarpMouseInWindow(window, halfWidth, halfHeight);
         }
         #else
@@ -156,7 +158,7 @@ int main() {
         for(int column = 0; column < SCREEN_WIDTH; column += COLS_PER_RAY) {
             // Position of the ray on the camera plane, from -1 (left) to 1 (right)
             float cameraX = 2 * column / (float)SCREEN_WIDTH - 1;
-            vec2f rayDir = (camDir + planeDir * cameraX).normalized();
+            Vector2 rayDir = (camDir + planeDir * cameraX).normalized();
             // Find line equation describing the ray walk
             LineEquation rayLine;
             // Stays constant during the frame
@@ -168,24 +170,28 @@ int main() {
             bool wasWallHit = false;
             int wallTileData;   // Number indicating tile properties
             float wallDistance; // Distance from a wall
-            vec2f wallNormal;   // Vector telling in which direction a wall is facing
+            Vector2 wallNormal;   // Vector telling in which direction a wall is facing
             SDL_Color wallColor;
             while(true) {
                 RayHitInfo rayInfo = dda.next();
                 // Exit the loop in appropriate moment
                 if( (wasWallHit) ||
-                    (dda.rayFlag & DDA_Algorithm::RF_TOO_FAR) ||
-                    (dda.rayFlag & DDA_Algorithm::RF_OUTSIDE) ) {
+                    (dda.rayFlag & DDA::RF_TOO_FAR) ||
+                    (dda.rayFlag & DDA::RF_OUTSIDE) ) {
                     break;
                 // If a ray touched an air tile (with data of 0), skip
-                } else if(!(dda.rayFlag & DDA_Algorithm::RF_HIT))
+                } else if(!(dda.rayFlag & DDA::RF_HIT))
                     continue;
 
-                int tileData = world.getTileData(rayInfo.tile.x, rayInfo.tile.y);
-                bool fromSide = dda.rayFlag & DDA_Algorithm::RF_SIDE;
+                int_pair p = world.getTileData(rayInfo.tile.x, rayInfo.tile.y);
+                if(p.second != Plane::E_CLEAR)
+                    break;
+                
+                int tileData = p.first;
+                bool fromSide = dda.rayFlag & DDA::RF_SIDE;
                 float minLineDist = 1e30;
 
-                for(const WallInfo& wallInfo : world.getTileWalls(tileData)) {
+                for(const Wall& wallInfo : world.getTileWalls(tileData)) {
                     const LineEquation* line = &wallInfo.line; // For convienence
                     // It will not be seen anyway
                     if(line->domainStart == line->domainEnd)
@@ -200,27 +206,34 @@ int main() {
                         rayIntX = rayInfo.point.x - (int)rayInfo.point.x;
                         rayIntY = (rayDir.y < 0) ? (1) : (0);
                     }
-                    rayLine.intercept = rayIntY - rayLine.slope * rayIntX; // Total intercept
+                    rayLine.height = rayIntY - rayLine.slope * rayIntX; // Total intercept
 
                     // Find intersection point of line defining wall geometry and the ray line.
-                    vec2f inter = line->intersection(rayLine);
+                    Vector2 inter = line->intersection(rayLine);
                     if((inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) ||
                        (inter.x < line->domainStart || inter.x > line->domainEnd)) {
                         // Intersection point is out of tile or domain bounds, skip it
                         continue;
                     } else {
                         // Intersection point is defined in specified bounds, process it
-                        vec2f tilePos = vec2f(
+                        Vector2 tilePos = Vector2(
                             ensureInteger(rayInfo.point.x), // Ensuring integers prevents them from flipping suddenly,
                             ensureInteger(rayInfo.point.y)  // for example: it makes 5.9999 -> 6 and 6.0001 -> 6.
                         );
                         tilePos.x -= ( fromSide && rayDir.x < 0) ? (1) : (0);
                         tilePos.y -= (!fromSide && rayDir.y < 0) ? (1) : (0);
-                        float pointDist = linePointDist(camera, tilePos + inter);
+
+                        // TEMPORARY COMPUTATION OF CAMERA PLANE LINE
+                        LineEquation plane(
+                            camera.getPlane().y / camera.getPlane().x,
+                            camera.getPosition().y - (camera.getPlane().y / camera.getPlane().x) * camera.getPosition().x,
+                            0, 1
+                        );
+                        float pointDist = plane.pointDistance(tilePos + inter);
                         // The closest line equation defines the wall geometry
                         if(pointDist < minLineDist) {
                             // Find normal vector of the hit wall
-                            vec2f normal = (vec2f::RIGHT).rotate(-1 * atanf(1 / line->slope * -1));
+                            Vector2 normal = (Vector2::RIGHT).rotate(-1 * atanf(1 / line->slope * -1));
                             if(line->slope < 0)
                                 normal = normal.scale(-1); // Make it consistent
                             // Save (for now) the nearest wall information
@@ -284,22 +297,4 @@ int main() {
     SDL_QuitSubSystem(SDL_INIT_VIDEO);
     SDL_Quit();
     return 0;
-}
-
-int ensureInteger(float n) {
-    // This simple function kills all demons that output integer while it is not a one, for example
-    // take number 4.999999(...), C++ tells me that it is 5, so I evaluate (int)5 and get 4 ... bruh!
-    return (int)(n + EI_TOLERANCE) > (int)(n) ? ceilf(n) : floorf(n);
-}
-
-float linePointDist(const Camera& cam, const vec2f& point) {
-    // Camera plane line equation: y = (pD.y/pD.x)*(x-cP.x)+cP.y; pD -> planeDir, cP -> camPos
-    // Transform it to general form: 0 = slope*x - 1*y + cP.y-slope*cP.x
-    // Coefficients: A=slope, B=-1, C=cP.y-slope*cP.x
-    float A = cam.getPlane().y / cam.getPlane().x;
-    float B = -1.0f;
-    float C = cam.getPosition().y - cam.getPosition().x * A;
-    // Distance from a point (x0, y0) to a line with coefficients A, B and C is given to
-    // be abs(A*x0+B*y0+C)/sqrt(A^2+B^2), apply it.
-    return std::abs(A * point.x + B * point.y + C) / sqrtf(A * A + B * B);
 }

@@ -1,0 +1,50 @@
+
+#ifndef _DDA_HPP
+#define _DDA_HPP
+
+#include "plane.hpp"
+#include "math.hpp"
+
+namespace rp {
+    struct RayHitInfo {
+        float distance;
+        Vector2 tile;
+        Vector2 point;
+
+        RayHitInfo();
+        RayHitInfo(float distance, Vector2 tile, Vector2 point, bool side);
+    };
+
+    class DDA {
+        private:
+            const Plane* plane;
+
+            bool initialized;
+            int maxTileDistSquared;
+            int stepX, stepY;             // Direction of a ray stepping
+            int planePosX, planePosY;     // Position of a tile the ray is currently in
+            float deltaDistX, deltaDistY; // Distances needed to move by one unit in both axes
+            float sideDistX, sideDistY;   // Currently-traveled distance by moving one unit in both axes
+            Vector2 start;     // Ray starting point
+            Vector2 direction; // Ray stepping direction (normalized)
+        public:
+            const float MAX_DD = 1e30f; // Maximum delta distance for both axes
+            int rayFlag;
+            // Ray flags telling various things about a ray
+            enum {
+                RF_CLEAR    = 0,
+                RF_HIT      = 1 << 1, // Informs that hit occurred
+                RF_SIDE     = 1 << 2, // Indicates that ray hit the tile from east/west direction
+                RF_TOO_FAR  = 1 << 3, // Set if a tile hit by ray exceeded the maximum tile distance
+                RF_OUTSIDE  = 1 << 4  // Tells that ray hit a tile which is out of the plane bounds
+            };
+
+            DDA(const Plane* plane, int maxTileDist);
+            /* Prepares things needed to perform the algorithm from point <start> in direction <direction>. */
+            void init(const Vector2& start, const Vector2& direction);
+            /* Performs one step resulting in hitting some tile, information about the hit is returned. */
+            RayHitInfo next();
+    };
+}
+
+#endif
