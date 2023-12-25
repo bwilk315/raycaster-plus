@@ -22,9 +22,24 @@ namespace rp {
     /********** CLASS: DIGITAL DIFFERENTIAL ANALYSIS ******/
     /******************************************************/
 
-    DDA::DDA(const Plane* plane, int maxTileDist) {
-        this->plane = plane;
-        this->maxTileDistSquared = maxTileDist * maxTileDist;
+    DDA::DDA() {
+
+    }
+    DDA::DDA(Scene* scene, int maxTileDist) {
+        setTargetScene(scene);
+        setMaxTileDistance(maxTileDist);
+    }
+    void DDA::setTargetScene(Scene* scene) {
+        this->scene = scene;
+    }
+    void DDA::setMaxTileDistance(float distance) {
+        maxTileDist = distance;
+    }
+    float DDA::getMaxTileDistance() const {
+        return maxTileDist;
+    }
+    Scene* DDA::getTargetScene() {
+        return scene;
     }
     void DDA::init(const Vector2& start, const Vector2& direction) {
         this->start = start;
@@ -66,13 +81,13 @@ namespace rp {
         // Check if hit tile is not exceeding the maximum tile distance
         int deltaPosX = planePosX - start.x;
         int deltaPosY = planePosY - start.y;
-        if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > maxTileDistSquared) {
+        if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > maxTileDist * maxTileDist) {
             rayFlag = DDA::RF_TOO_FAR;
             return RayHitInfo();
         }
         // Check if hit tile is not outside the plane
-        int_pair p = plane->getTileData(planePosX, planePosY);
-        if(p.second != Plane::E_CLEAR || !plane->contains(planePosX, planePosY)) {
+        int_pair p = scene->getTileData(planePosX, planePosY);
+        if(p.second != Scene::E_CLEAR || !scene->contains(planePosX, planePosY)) {
             rayFlag = DDA::RF_OUTSIDE;
             return RayHitInfo();
         }

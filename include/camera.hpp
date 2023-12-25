@@ -5,6 +5,8 @@
 #include "math.hpp"
 
 namespace rp {
+    using ::std::abs;
+
     class Camera {
         private:
             float fieldOfView;
@@ -13,6 +15,7 @@ namespace rp {
             Vector2 position;
             Vector2 direction;
         public:
+            static const float DIR_BIAS;
             static const float MIN_FOV;
             static const float MAX_FOV;
 

@@ -2,6 +2,7 @@
 #include "../include/camera.hpp"
 
 namespace rp {
+    const float Camera::DIR_BIAS = 0.0001f;
     const float Camera::MIN_FOV = 0.01f;
     const float Camera::MAX_FOV = M_PI - 0.01f;
 
@@ -23,8 +24,13 @@ namespace rp {
         position = position + change;
     }
     void Camera::setDirection(float radians) {
-        direction = (Vector2::RIGHT).rotate(radians);
-        plane = (Vector2::DOWN).rotate(radians) * planeMagnitude;
+        // Applying small errors sometimes guarantee infinite-slope-immune behaviour
+        direction = (Vector2::RIGHT).rotate(
+            (abs(radians) == M_PI_2) ? (radians - DIR_BIAS) : (radians)
+        );
+        plane = (Vector2::DOWN).rotate(
+            (radians == 0 || radians == M_PI) ? (radians - DIR_BIAS) : (radians)
+        ) * planeMagnitude;
     }
     void Camera::setFieldOfView(float radians) {
         fieldOfView = clamp(radians, Camera::MIN_FOV, Camera::MAX_FOV);

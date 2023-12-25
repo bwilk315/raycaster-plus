@@ -88,42 +88,43 @@ namespace rp {
         this->y = y;
     }
     float Vector2::dot(const Vector2& other) const {
-        return this->x * other.x + this->y * other.y;
+        return x * other.x + y * other.y;
     }
     float Vector2::magnitude() const {
-        return sqrtf(this->x * this->x + this->y * this->y);
+        return sqrtf(x * x + y * y);
     }
     Vector2 Vector2::add(const Vector2& other) const {
-        return Vector2(this->x + other.x, this->y + other.y);
+        return Vector2(x + other.x, y + other.y);
     }
     Vector2 Vector2::normalized() const {
-        return this->scale(1 / this->magnitude());
+        float mag = magnitude();
+        return scale((mag == 0) ? (0) : (1 / mag));
     }
     Vector2 Vector2::orthogonal() const {
-        return Vector2(this->y, -1 * this->x);
+        return Vector2(y, -1 * x);
     }
     Vector2 Vector2::rotate(float radians) const {
         float sin = sinf(radians);
         float cos = cosf(radians);
         return Vector2(
-            cos * this->x - sin * this->y,
-            sin * this->x + cos * this->y
+            cos * x - sin * y,
+            sin * x + cos * y
         );
     }
     Vector2 Vector2::scale(float scalar) const {
-        return Vector2(this->x * scalar, this->y * scalar);
+        return Vector2(x * scalar, y * scalar);
     }
     float Vector2::operator*(const Vector2& other) const {
-        return this->dot(other);
+        return dot(other);
     }
     Vector2 Vector2::operator+(const Vector2& other) const {
-        return this->add(other);
+        return add(other);
     }
     Vector2 Vector2::operator-(const Vector2& other) const {
-        return this->add(other.scale(-1));
+        return add(other.scale(-1));
     }
     Vector2 Vector2::operator*(const float scalar) const {
-        return this->scale(scalar);
+        return scale(scalar);
     }
     ostream& operator<<(ostream& stream, const Vector2& vec) {
         stream << "[ " << vec.x << " " << vec.y << "]";

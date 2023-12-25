@@ -2,7 +2,7 @@
 #ifndef _DDA_HPP
 #define _DDA_HPP
 
-#include "plane.hpp"
+#include "scene.hpp"
 #include "math.hpp"
 
 namespace rp {
@@ -17,16 +17,16 @@ namespace rp {
 
     class DDA {
         private:
-            const Plane* plane;
-
             bool initialized;
-            int maxTileDistSquared;
+            int maxTileDist;
             int stepX, stepY;             // Direction of a ray stepping
             int planePosX, planePosY;     // Position of a tile the ray is currently in
             float deltaDistX, deltaDistY; // Distances needed to move by one unit in both axes
             float sideDistX, sideDistY;   // Currently-traveled distance by moving one unit in both axes
             Vector2 start;     // Ray starting point
             Vector2 direction; // Ray stepping direction (normalized)
+
+            Scene* scene;
         public:
             const float MAX_DD = 1e30f; // Maximum delta distance for both axes
             int rayFlag;
@@ -39,7 +39,13 @@ namespace rp {
                 RF_OUTSIDE  = 1 << 4  // Tells that ray hit a tile which is out of the plane bounds
             };
 
-            DDA(const Plane* plane, int maxTileDist);
+            DDA();
+            DDA(Scene* scene, int maxTileDist);
+
+            void setTargetScene(Scene* scene);
+            void setMaxTileDistance(float distance);
+            float getMaxTileDistance() const;
+            Scene* getTargetScene();
             /* Prepares things needed to perform the algorithm from point <start> in direction <direction>. */
             void init(const Vector2& start, const Vector2& direction);
             /* Performs one step resulting in hitting some tile, information about the hit is returned. */
