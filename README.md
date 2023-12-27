@@ -1,5 +1,5 @@
 
-# Raycaster Plus
+# Raycaster Plus (Obsolete)
 ## General description
 As the name suggests, it is raycasting-based game engine enchanced using non-standard additional features. With help of SDL2 library and amazing article on topic of raycasting written by Lode Vandevenne I programmed the engine core, which only allows boxes to be rendered.
 After documenting the core mechanics (to not get lost obviously), I proceeded to extend its capabilities. Stable extensions of RP game engine core are listed below:
