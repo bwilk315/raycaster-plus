@@ -10,6 +10,8 @@
 namespace rp {
     using ::std::string;
     using ::std::ostream;
+    using ::std::sqrt;
+    using ::std::abs;
     
     extern const float EI_TOL;
 

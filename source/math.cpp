@@ -51,7 +51,7 @@ namespace rp {
         this->domainEnd = domainEnd;
     }
     float LineEquation::pointDistance(const Vector2& point) {
-        return std::abs(slope * point.x - point.y + height) / sqrtf(slope * slope + 1);
+        return abs(slope * point.x - point.y + height) / sqrt(slope * slope + 1);
     }
     Vector2 LineEquation::intersection(const LineEquation& other) const {
         // When current line is very vertical
@@ -65,7 +65,8 @@ namespace rp {
         return intersection(other);
     }
     ostream& operator<<(ostream& stream, const LineEquation& line) {
-        stream << line.slope << " * x + " << line.height;
+        stream << "LineEquation(slope=" << line.slope << ", height=" << line.height;
+        stream << ", domainStart=" << line.domainStart << ", domainEnd=" << line.domainEnd << ")";
         return stream;
     }
 
@@ -127,7 +128,7 @@ namespace rp {
         return scale(scalar);
     }
     ostream& operator<<(ostream& stream, const Vector2& vec) {
-        stream << "[ " << vec.x << " " << vec.y << "]";
+        stream << "Vector2(x=" << vec.x << ", y=" << vec.y << ")";
         return stream;
     }
 }

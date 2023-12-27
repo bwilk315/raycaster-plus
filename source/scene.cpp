@@ -58,7 +58,8 @@ namespace rp {
     int_pair Scene::maxTileData() const {
         int max = -1;
         for(int i = 0; i < width * height; i++)
-            if(tiles[i] > max) max = tiles[i];
+            if(tiles[i] > max)
+                max = tiles[i];
         return int_pair(max, (max == -1) ? (Scene::E_TILE_NOT_FOUND) : (Scene::E_CLEAR));
     }
     int Scene::getWidth() const {

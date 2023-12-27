@@ -26,14 +26,16 @@ namespace rp {
 
     class Engine {
         private:
-            bool run;
-            bool isCursorLocked;
+            bool bRun;
+            bool bIsCursorLocked;
+            bool bLightEnabled;
             int iColumnsPerRay;
             int iScreenWidth;
             int iScreenHeight;
             int msFrameDuration;
             float fAspectRatio;
             float fMaxTileDist;
+            float fLightAngle;
             uint64_t frameIndex;
             time_point<system_clock> tpLast;
             duration<float> elapsedTime;
@@ -52,6 +54,7 @@ namespace rp {
             void setCursorVisibility(bool visible);
             void setColumnsPerRay(int columns);
             void setFrameRate(int framesPerSecond);
+            void setLightBehavior(bool enabled, float angle);
             void setMainCamera(const Camera* camera);
             int getScreenWidth() const;
             int getScreenHeight() const;

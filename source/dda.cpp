@@ -1,6 +1,8 @@
 
 #include "../include/dda.hpp"
 
+#include <iostream>
+
 namespace rp {
 
     /************************************************/
@@ -12,10 +14,14 @@ namespace rp {
         this->tile = Vector2::ZERO;
         this->point = Vector2::ZERO;
     }
-    RayHitInfo::RayHitInfo(float distance, Vector2 tile, Vector2 point, bool side) {
+    RayHitInfo::RayHitInfo(float distance, Vector2 tile, Vector2 point) {
         this->distance = distance;
         this->tile = tile;
         this->point = point;
+    }
+    ostream& operator<<(ostream& stream, const RayHitInfo& hit) {
+        stream << "RayHitInfo(distance=" << hit.distance << ", tile=" << hit.tile << ", point=" << hit.point << ")";
+        return stream;
     }
 
     /******************************************************/
@@ -23,9 +29,10 @@ namespace rp {
     /******************************************************/
 
     DDA::DDA() {
-
+        this->initialized = false;
     }
     DDA::DDA(Scene* scene, int maxTileDist) {
+        this->initialized = false;
         setTargetScene(scene);
         setMaxTileDistance(maxTileDist);
     }
@@ -44,7 +51,6 @@ namespace rp {
     void DDA::init(const Vector2& start, const Vector2& direction) {
         this->start = start;
         this->direction = direction;
-        this->rayFlag = DDA::RF_CLEAR;
         this->initialized = true;
 
         planePosX = (int)start.x;
@@ -66,8 +72,16 @@ namespace rp {
             stepY = 1;
             sideDistY = (1 + planePosY - start.y) * deltaDistY;
         }
+        // State for the first hit
+        this->rayFlag = sideDistX < sideDistY ? DDA::RF_SIDE : DDA::RF_CLEAR;
     }
     RayHitInfo DDA::next() {
+        if(!initialized) {
+            rayFlag = DDA::RF_ERROR;
+            return RayHitInfo();
+        }
+        // Do not forget about the hits in the origin tile
+
         // Step along appropriate axis
         if(sideDistX < sideDistY) {
             sideDistX += deltaDistX;
@@ -91,6 +105,7 @@ namespace rp {
             rayFlag = DDA::RF_OUTSIDE;
             return RayHitInfo();
         }
+
         // If tile data is not zero, then ray hit this tile
         int tileData = p.first;
         if(tileData != 0) {
@@ -99,8 +114,7 @@ namespace rp {
             return RayHitInfo(
                 distance,
                 Vector2(planePosX, planePosY),
-                start + direction * distance,
-                rayFlag & DDA::RF_SIDE
+                start + direction * distance
             );
         }
         // This should not trigger but it exists for safety reasons
