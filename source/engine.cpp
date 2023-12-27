@@ -1,5 +1,5 @@
 
-//#define DEBUG
+#define DEBUG
 
 #include "../include/engine.hpp"
 
@@ -154,9 +154,40 @@ namespace rp {
             // Perform step-based DDA algorithm to find out which tiles get hit by the ray, find
             // the nearest wall of the nearest tile.
             walker->init(camPos, rayDir);
+            bool originDone = false; // Whether walls from the origin were examined
             while(true) {
-                RayHitInfo hit = walker->next();
+                RayHitInfo hit;
+                if(originDone) {
+                    hit = walker->next();
+                } else {
+                    // Simulate a ray entering the current (aka origin) tile, to take walls that are
+                    // defined for the tile into account.
+                    bool side = true;
+                    int camTileX = (int)camPos.x;
+                    int camTileY = (int)camPos.y;
+                    float localCamX = camPos.x - camTileX;
+                    float localCamY = camPos.y - camTileY;
+                    Vector2 backPoint;
+                    if(rayDir.x >= 0) {
+                        backPoint.x = 0;
+                        backPoint.y = -1 * rayLine.slope * localCamX + localCamY;
+                    } else {
+                        backPoint.x = 1;
+                        backPoint.y = rayLine.slope * (1 - localCamX) + localCamY;
+                    }
+                    if(backPoint.y > 1) {
+                        backPoint.x = (1 + rayLine.slope * localCamX - localCamY) / rayLine.slope;
+                        backPoint.y = 1;
+                        side = false;
+                    } else if(backPoint.y < 0) {
+                        backPoint.x = (rayLine.slope * localCamX - localCamY) / rayLine.slope;
+                        backPoint.y = 0;
+                        side = false;
+                    }
 
+                    walker->rayFlag = DDA::RF_HIT | (side ? (DDA::RF_SIDE) : (DDA::RF_CLEAR));
+                    hit = RayHitInfo(0, Vector2(camTileX, camTileY), Vector2(backPoint.x + camTileX, backPoint.y + camTileY));
+                }
                 
                 // If next tiles are unreachable, or nearest wall was found exit the loop
                 if( (nwExists) ||
@@ -176,6 +207,9 @@ namespace rp {
                 // It tells whether ray hit the tile from left or right direction
                 bool fromSide = walker->rayFlag & DDA::RF_SIDE;
 
+                // if(column == iScreenWidth / 2) {
+                //     system("clear");
+                // }
                 // Find the nearest wall in the obtained non-air tile
                 for(const Wall& wallInfo : walker->getTargetScene()->getTileWalls(tileData)) {
                     const LineEquation* line = &wallInfo.line; // For convienence
@@ -201,6 +235,24 @@ namespace rp {
                         continue;
                     } else {
                         // Intersection point is defined in specified bounds, process it
+
+                        // Find normal vector that always points out of the wall plane
+                        float normAngle = (line->slope == 0) ? (-1 * M_PI_2) : (atanf(1 / line->slope * -1));
+                        float globalPosInterY = line->slope * (camPos.x - hit.tile.x) + line->height + hit.tile.y;
+                        Vector2 normal = (Vector2::RIGHT).rotate(normAngle);
+                        if( (line->slope >= 0 && camPos.y > globalPosInterY) ||
+                            ((line->slope < 0 && camPos.y < globalPosInterY)))
+                            // This is based on the fact of player being either above or below the wall line equation
+                            normal = normal * -1;
+
+                        // if(column == iScreenWidth / 2) {
+                        //     cout << normal << "\n";
+                        // }
+
+                        if(!originDone && rayDir.dot(normal) > 0)
+                            continue;
+
+
                         Vector2 tilePos = Vector2(
                             ensureInteger(hit.point.x), // Ensuring integers prevents them from flipping suddenly,
                             ensureInteger(hit.point.y)  // for example: it makes 5.9999 -> 6 and 6.0001 -> 6.
@@ -211,21 +263,25 @@ namespace rp {
                         float pointDist = planeLine.pointDistance(tilePos + inter);
                         if(pointDist < nwDistance) {
                             // New nearest wall found, save its information
-                            float normAngle = line->slope == 0 ? M_PI_2 : atanf(1 / line->slope * -1);
                             nwTileData = tileData;
                             nwDistance = pointDist;
                             nwColor = wallInfo.color;
-                            nwNormal = (Vector2::RIGHT).rotate(normAngle);
+                            nwNormal = normal;
                         }
                         nwExists = true;
                     }
                 }
+                
+                originDone = true;
             }
             if(!nwExists) continue; // Ray hit nothing
+            
 
             // Apply shading if light source is enabled
             if(bLightEnabled) {
-                float bn = clamp(std::abs(nwNormal.dot(lightDir)) + 0.5f, 0.5f, 1.0f);
+                const float minBn = 0.3f;
+                float perc = -1 * (nwNormal.dot(lightDir) - 1) / 2; // Brightness linear interploation percent
+                float bn = minBn + (1 - minBn) * perc; // Final brightness
                 nwColor.r *= bn;
                 nwColor.g *= bn;
                 nwColor.b *= bn;

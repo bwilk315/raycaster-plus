@@ -80,8 +80,7 @@ namespace rp {
             rayFlag = DDA::RF_ERROR;
             return RayHitInfo();
         }
-        // Do not forget about the hits in the origin tile
-
+        
         // Step along appropriate axis
         if(sideDistX < sideDistY) {
             sideDistX += deltaDistX;
