@@ -23,6 +23,10 @@ namespace rp {
         PRESS,
         UP
     };
+    enum RenderFitMode {
+        CHANGE_FOV, // Rendered frame uses the whole screen, but camera FOV is changed
+        TRIM_SCREEN // In reverse to the above: uses part of the screen but FOV is untouched
+    };
 
     class Engine {
         private:
@@ -32,16 +36,20 @@ namespace rp {
             int iColumnsPerRay;
             int iScreenWidth;
             int iScreenHeight;
+            int iHorOffset;
+            int iVerOffset;
+            int iColumnsCount;
             int msFrameDuration;
             float fAspectRatio;
             float fMaxTileDist;
             float fLightAngle;
             uint64_t frameIndex;
+            RenderFitMode renderFitMode;
             time_point<system_clock> tpLast;
             duration<float> elapsedTime;
             map<int, KeyState> keyStates;
 
-            const Camera* mainCamera;
+            Camera* mainCamera;
             DDA* walker = nullptr;
             SDL_Window* sdlWindow;
             SDL_Renderer* sdlRenderer;
@@ -55,7 +63,8 @@ namespace rp {
             void setColumnsPerRay(int columns);
             void setFrameRate(int framesPerSecond);
             void setLightBehavior(bool enabled, float angle);
-            void setMainCamera(const Camera* camera);
+            void setMainCamera(Camera* camera);
+            void setRenderFitMode(const RenderFitMode& rfm);
             int getScreenWidth() const;
             int getScreenHeight() const;
             float getElapsedTime() const;

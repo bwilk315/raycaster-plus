@@ -5,9 +5,9 @@
 // Video settings
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 720
-#define LOOP_FPS 60
+#define LOOP_FPS 100
 #define COLS_PER_RAY 4
-#define MAX_TILE_DIST 20
+#define MAX_TILE_DIST 16
 // Player settings
 #define MOVE_SPEED 2
 #define FOV_ANGLE M_PI * 0.5f
@@ -31,18 +31,27 @@ int main() {
     engine.getWalker()->setTargetScene(&scene);
     engine.getWalker()->setMaxTileDistance(MAX_TILE_DIST);
     engine.setMainCamera(&camera);
+    engine.setRenderFitMode(RenderFitMode::CHANGE_FOV); // works once
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
     engine.setLightBehavior(true, M_PI / 4);
     camera.setDirection(0);
 
-    bool efSunCycle = true;
+    bool efSunCycle = false;
     bool efBillboard = false;
+    bool isTrimMode = true;
     float lightAngle = 0;
+
 
     while(engine.tick()) {
         
         /********** EXPERIMENTAL FEATURES **********/
+
+        // Dynamic render fit mode
+        if(engine.getKeyState(SDL_SCANCODE_0) == KeyState::DOWN) { // bugged
+            isTrimMode = !isTrimMode;
+            engine.setRenderFitMode(isTrimMode ? RenderFitMode::TRIM_SCREEN : RenderFitMode::CHANGE_FOV);
+        }
 
         // Sun-cycle
         if(efSunCycle) {

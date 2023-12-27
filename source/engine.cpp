@@ -59,8 +59,37 @@ namespace rp {
         bLightEnabled = enabled;
         fLightAngle = angle;
     }
-    void Engine::setMainCamera(const Camera* camera) {
+    void Engine::setMainCamera(Camera* camera) {
         mainCamera = camera;
+    }
+    void Engine::setRenderFitMode(const RenderFitMode& rfm) {
+
+        
+        // THIS WORKS FOR THE FIRST TRY, THEN IT BEHAVES WEIRD
+
+
+        renderFitMode = rfm;
+        if(rfm == RenderFitMode::CHANGE_FOV) {
+            // Change the camera field of view so look of the walls is perspective-correct
+            // I do things using the fact that if you are 1/2 from the wall then with 90deg
+            // FOV your screen height would be used completely.
+            mainCamera->setFieldOfView(2 * atan(1 / fAspectRatio));
+            iHorOffset = 0;
+            iVerOffset = 0;
+            iColumnsCount = iScreenWidth;
+        } else if(rfm == RenderFitMode::TRIM_SCREEN) {
+            // Set up horizontal and vertical offsets for drawing columns to make the rendered
+            // frame always form a square, which guarantees perspective-correct look.
+            if(iScreenWidth > iScreenHeight) {
+                iHorOffset = (iScreenWidth - iScreenHeight) / 2;
+                iVerOffset = 0;
+                iColumnsCount = iScreenHeight;
+            } else {
+                iHorOffset = 0;
+                iVerOffset = (iScreenHeight - iScreenWidth) / 2;
+                iColumnsCount = iScreenWidth;
+            }
+        }
     }
     int Engine::getScreenWidth() const {
         return iScreenWidth;
@@ -136,9 +165,9 @@ namespace rp {
         SDL_RenderClear(sdlRenderer);
 
         // Draw the current frame, which consists of pixel columns
-        for(int column = 0; column < iScreenWidth; column += iColumnsPerRay) {
+        for(int column = 0; column < iColumnsCount; column += iColumnsPerRay) {
             // Position of the ray on the camera plane, from -1 (left) to 1 (right)
-            float cameraX = 2 * column / (float)iScreenWidth - 1;
+            float cameraX = 2 * column / (float)iColumnsCount - 1;
             Vector2 rayDir = (camDir + planeVec * cameraX).normalized();
             LineEquation rayLine;  // Line equation describing the ray walk
             // Ray slope stays constant for all hits
@@ -207,9 +236,6 @@ namespace rp {
                 // It tells whether ray hit the tile from left or right direction
                 bool fromSide = walker->rayFlag & DDA::RF_SIDE;
 
-                // if(column == iScreenWidth / 2) {
-                //     system("clear");
-                // }
                 // Find the nearest wall in the obtained non-air tile
                 for(const Wall& wallInfo : walker->getTargetScene()->getTileWalls(tileData)) {
                     const LineEquation* line = &wallInfo.line; // For convienence
@@ -245,13 +271,8 @@ namespace rp {
                             // This is based on the fact of player being either above or below the wall line equation
                             normal = normal * -1;
 
-                        // if(column == iScreenWidth / 2) {
-                        //     cout << normal << "\n";
-                        // }
-
                         if(!originDone && rayDir.dot(normal) > 0)
                             continue;
-
 
                         Vector2 tilePos = Vector2(
                             ensureInteger(hit.point.x), // Ensuring integers prevents them from flipping suddenly,
@@ -287,28 +308,45 @@ namespace rp {
                 nwColor.b *= bn;
             }
 
-            // Display the ray by drawing an appropriate vertical strip, scaling is applied in form of
-            // aspect ratio (to make everything have the same size across all resolutions), and camera
-            // plane length (to make squares look always like squares).
-            //loat persCorrector = 1 / (2 * tanf(mainCamera->getFieldOfView() / 2));
-            float scale = (1 / fAspectRatio) * (1 / (2 * planeVec.magnitude()));
-            int lineHeight = (iScreenHeight / nwDistance) * scale;
-            int drawStart = iScreenHeight / 2 - lineHeight / 2;
-            int drawEnd = iScreenHeight / 2 + lineHeight / 2;
-            drawStart = drawStart < 0 ? 0 : drawStart;
-            drawEnd = drawEnd >= iScreenHeight ? (iScreenHeight - 1) : drawEnd;
+            // Display the ray by drawing an appropriate vertical strip, with settings appropriate
+            // for the current render fit mode.
+            int renderHeight = (renderFitMode == RenderFitMode::CHANGE_FOV) ? (iScreenHeight) : (iColumnsCount);
+            float refDist = 1 / (2 * tanf(mainCamera->getFieldOfView() / 2));
+            int lineHeight = (renderHeight / nwDistance * refDist) / ((renderFitMode == RenderFitMode::CHANGE_FOV) ? (fAspectRatio) : (1));
+
+            int drawStart = renderHeight / 2 - lineHeight / 2;
+            int drawEnd = renderHeight / 2 + lineHeight / 2;
+            drawStart = (drawStart < 0) ? (0) : (drawStart);
+            drawEnd = (drawEnd >= renderHeight) ? (renderHeight - 1) : (drawEnd);
 
             SDL_SetRenderDrawColor(sdlRenderer, nwColor.r, nwColor.g, nwColor.b, SDL_ALPHA_OPAQUE);
             for(int i = 0; i < iColumnsPerRay; i++)
-                SDL_RenderDrawLine(sdlRenderer, column + i, drawStart, column + i, drawEnd);
+                SDL_RenderDrawLine(
+                    sdlRenderer,
+                    iHorOffset + column + i,
+                    iVerOffset + drawStart,
+                    iHorOffset + column + i,
+                    iVerOffset + drawEnd
+                );
 
             #ifdef DEBUG
-            if(column == iScreenWidth / 2) {
+            if(abs(column - iColumnsCount / 2) <= iColumnsPerRay) {
                 SDL_SetRenderDrawColor(sdlRenderer, 255, 255, 255, 255);
-                SDL_RenderDrawLine(sdlRenderer, iScreenWidth / 2, 0, iScreenWidth / 2, iScreenHeight);
+                SDL_RenderDrawLine(
+                    sdlRenderer,
+                    iScreenWidth / 2,
+                    iVerOffset,
+                    iScreenWidth / 2,
+                    iScreenHeight - iVerOffset
+                );
             }
             #endif
         }
+
+        #ifdef DEBUG
+        // system("clear");
+        // cout << "Frames per second: " << (1.0f / getElapsedTime()) << "\n";
+        #endif
 
         if(bIsCursorLocked)
             SDL_WarpMouseInWindow(sdlWindow, iScreenWidth / 2, iScreenHeight / 2);
