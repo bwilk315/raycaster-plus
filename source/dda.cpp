@@ -45,7 +45,7 @@ namespace rp {
     float DDA::getMaxTileDistance() const {
         return maxTileDist;
     }
-    Scene* DDA::getTargetScene() {
+    Scene* const DDA::getTargetScene() {
         return scene;
     }
     void DDA::init(const Vector2& start, const Vector2& direction) {

@@ -1,12 +1,13 @@
 
 #include <iostream>
+#include <png.h>
 #include "include/engine.hpp"
 
 using namespace rp;
 
 int main() {
     Scene scene;
-    int_pair error = scene.loadFromFile("generated.plane");
+    int_pair error = scene.loadFromFile("resources/generated.plane");
     std::cout << error.first << ", " << error.second << std::endl;
     if(error.second != Scene::E_CLEAR)
         return 1;
@@ -25,7 +26,7 @@ int main() {
     engine.setLightBehavior(true, M_PI / 4);
     engine.setMainCamera(&camera);
     engine.setWindowResize(true);
-    engine.setRenderFitMode(RenderFitMode::STRETCH);
+    engine.setRenderFitMode(RenderFitMode::SQUARE);
     engine.getWalker()->setTargetScene(&scene);
     engine.getWalker()->setMaxTileDistance(16);
     
@@ -34,11 +35,12 @@ int main() {
     bool efDynamicRFM = true;
     bool efDynamicFOV = true;
     bool efSunCycle = false;
-    bool efBillboard = false;
+    bool efBillboard = true;
     int fitMode = 0;
     float lightAngle = 0;
     while(engine.tick()) {
-        
+        //camera.setDirection(0);
+
         /********** EXPERIMENTAL FEATURES **********/
 
         // Dynamic render fit mode
@@ -87,12 +89,15 @@ int main() {
             float delta = b * b - 4.0f * a * c;
             float x1 = (-1 * b - sqrtf(delta)) / (2.0f * a);
             float x2 = (-1 * b + sqrtf(delta)) / (2.0f * a);
+            x1 = 0; // for amogus
+            x2 = 1;
             engine.getWalker()->getTargetScene()->setTileWall(
-                6,
+                5,
                 0,
                 Wall(
                     LineEquation(slope, intercept, x1 < x2 ? x1 : x2, x1 > x2 ? x1 : x2),
-                    { 255, 128, 64}
+                    { 255, 128, 64},
+                    "resources/amogus.png"
                 )
             );
         }

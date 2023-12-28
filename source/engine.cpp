@@ -1,5 +1,5 @@
 
-#define DEBUG
+//#define DEBUG
 
 #include "../include/engine.hpp"
 
@@ -113,7 +113,7 @@ namespace rp {
     KeyState Engine::getKeyState(int scanCode) const {
         return keyStates.count(scanCode) == 0 ? KeyState::NONE : keyStates.at(scanCode);
     }
-    DDA* Engine::getWalker() {
+    DDA* const Engine::getWalker() {
         return walker;
     }
     SDL_Window* Engine::getWindowHandle() {
@@ -165,6 +165,7 @@ namespace rp {
         }
 
         // Cache often-used information
+        Scene* const mainScene = walker->getTargetScene();
         Vector2 camDir = mainCamera->getDirection();
         Vector2 camPos = mainCamera->getPosition();
         Vector2 planeVec = mainCamera->getPlane();
@@ -190,11 +191,13 @@ namespace rp {
             rayLine.slope = (rayDir.x == 0) ? (LineEquation::MAX_SLOPE) : (rayDir.y / rayDir.x);
 
             // Properties of the nearest wall, which will get drawn if found
-            bool nwExists     = false;
-            int nwTileData    = -1;
-            float nwDistance  = 1e30;
-            SDL_Color nwColor = {0, 0, 0, 0};
-            Vector2 nwNormal  = Vector2::ZERO;
+            bool nwExists        = false;
+            int nwTileData       = -1;
+            float nwPlaneNormX     = -1; // Normalized horizontal position on the wall plane
+            float nwDistance     = 1e30;
+            Vector2 nwNormal     = Vector2::ZERO;
+            SDL_Color nwColor    = {0, 0, 0, 0};
+            string nwTextureFile = "";
 
             // Perform step-based DDA algorithm to find out which tiles get hit by the ray, find
             // the nearest wall of the nearest tile.
@@ -244,7 +247,7 @@ namespace rp {
                     continue;
 
                 // Obtain the hit tile data
-                int_pair p = walker->getTargetScene()->getTileData(hit.tile.x, hit.tile.y);
+                int_pair p = mainScene->getTileData(hit.tile.x, hit.tile.y);
                 if(p.second != Scene::E_CLEAR)
                     break;
                 int tileData = p.first;
@@ -252,11 +255,18 @@ namespace rp {
                 // It tells whether ray hit the tile from left or right direction
                 bool fromSide = walker->rayFlag & DDA::RF_SIDE;
 
+
+                // if(column == iColumnsCount / 2) {
+                //     system("clear");
+                // }
+
+
                 // Find the nearest wall in the obtained non-air tile
-                for(const Wall& wallInfo : walker->getTargetScene()->getTileWalls(tileData)) {
+                for(const Wall& wallInfo : mainScene->getTileWalls(tileData)) {
                     const LineEquation* line = &wallInfo.line; // For convienence
                     if(line->domainStart == line->domainEnd) // It will not be seen anyway
                         continue;
+
                     // Update the ray line intercept according to the ray hit point
                     float rayIntX;
                     float rayIntY;
@@ -279,13 +289,15 @@ namespace rp {
                         // Intersection point is defined in specified bounds, process it
 
                         // Find normal vector that always points out of the wall plane
+                        bool isNormalFlipped = false;
                         float normAngle = (line->slope == 0) ? (-1 * M_PI_2) : (atanf(1 / line->slope * -1));
                         float globalPosInterY = line->slope * (camPos.x - hit.tile.x) + line->height + hit.tile.y;
                         Vector2 normal = (Vector2::RIGHT).rotate(normAngle);
-                        if( (line->slope >= 0 && camPos.y > globalPosInterY) ||
-                            ((line->slope < 0 && camPos.y < globalPosInterY)))
-                            // This is based on the fact of player being either above or below the wall line equation
+                        if( (line->slope >= 0 && camPos.y > globalPosInterY) || // If camera is above the line or below
+                            (line->slope  < 0 && camPos.y < globalPosInterY)) { // it, normal needs to be flipped.
                             normal = normal * -1;
+                            isNormalFlipped = true;
+                        }
 
                         if(!originDone && rayDir.dot(normal) > 0)
                             continue;
@@ -300,10 +312,49 @@ namespace rp {
                         float pointDist = planeLine.pointDistance(tilePos + inter);
                         if(pointDist < nwDistance) {
                             // New nearest wall found, save its information
-                            nwTileData = tileData;
-                            nwDistance = pointDist;
-                            nwColor = wallInfo.color;
-                            nwNormal = normal;
+
+                            // Find two places where the line intersects with the tile boundary, it is later
+                            // used to know distance of the intersection point along the line.
+                            Vector2 lh0, lh1;
+                            lh0.x = (line->slope == 0) ? (0) : (-1 * line->height / line->slope);
+                            if(lh0.x < 0) {
+                                lh0.x = 0;
+                                lh0.y = line->height;
+                            } else if(lh0.x > 1) {
+                                lh0.x = 1;
+                                lh0.y = line->slope + line->height;
+                            } else {
+                                lh0.y = 0;
+                            }
+                            lh1.x = (line->slope == 0) ? (1) : ((1 - line->height) / line->slope);
+                            if(lh1.x < 0) {
+                                lh1.x = 0;
+                                lh1.y = line->height;
+                            } else if(lh1.x > 1) {
+                                lh1.x = 1;
+                                lh1.y = line->slope + line->height;
+                            } else {
+                                lh1.y = 1;
+                            }
+                            
+                            // Save the new nearest wall information
+                            nwTileData    = tileData;
+                            nwDistance    = pointDist;
+                            nwColor       = wallInfo.color;
+                            nwNormal      = normal;
+                            nwTextureFile = wallInfo.textureFile;
+
+                            // Compute normalized horizontal position on the wall plane
+                            float wallPlaneX = ((isNormalFlipped ? lh1 : lh0) - inter).magnitude();
+                            nwPlaneNormX = wallPlaneX / (lh1 - lh0).magnitude();
+
+
+                            // if(column == iColumnsCount / 2) {
+                            //     system("clear");
+                            //     std::cout << *line << ": " << inter << "\n";
+                            // }
+
+
                         }
                         nwExists = true;
                     }
@@ -329,21 +380,46 @@ namespace rp {
             int renderHeight = getRenderHeight();
             float refDist = 1 / (2 * tanf(mainCamera->getFieldOfView() / 2));
             int lineHeight = renderHeight * (1 / (nwDistance / refDist));
-
-            int drawStart = renderHeight / 2 - lineHeight / 2;
-            int drawEnd = renderHeight / 2 + lineHeight / 2;
+            int drawStart = renderHeight / 2 + lineHeight / 2;
+            int drawEnd = renderHeight / 2 - lineHeight / 2;
             drawStart = (drawStart < 0) ? (0) : (drawStart);
             drawEnd = (drawEnd >= renderHeight) ? (renderHeight - 1) : (drawEnd);
 
-            SDL_SetRenderDrawColor(sdlRenderer, nwColor.r, nwColor.g, nwColor.b, SDL_ALPHA_OPAQUE);
-            for(int i = 0; i < iColumnsPerRay; i++)
-                SDL_RenderDrawLine(
-                    sdlRenderer,
-                    iHorOffset + column + i,
-                    iVerOffset + drawStart,
-                    iHorOffset + column + i,
-                    iVerOffset + drawEnd
-                );
+            // Use texture if existent, otherwise just a solid color
+            const Texture* tex = mainScene->getTexture(nwTextureFile);
+            if(tex == nullptr) {
+                SDL_SetRenderDrawColor(sdlRenderer, nwColor.r, nwColor.g, nwColor.b, SDL_ALPHA_OPAQUE);
+                for(int i = 0; i < iColumnsPerRay; i++)
+                    SDL_RenderDrawLine(
+                        sdlRenderer,
+                        iHorOffset + column + i,
+                        iVerOffset + drawStart,
+                        iHorOffset + column + i,
+                        iVerOffset + drawEnd
+                    );
+            } else {
+                // Draw part of the texture from top to bottom using normalized plane position information
+                int texHeight = tex->getHeight();
+                float pixelHeight = lineHeight / (float)texHeight;
+
+                // if(column == iColumnsCount / 2) {
+                //     system("clear");
+                //     std::cout << nwPlaneNormX << "\n";
+                // }
+
+                for(int y = 0; y < texHeight; y++) {
+                    SDL_Color px = tex->getPixelNorm(nwPlaneNormX, y / (float)texHeight);
+                    SDL_SetRenderDrawColor(sdlRenderer, px.r, px.g, px.b, 255);
+                    for(int i = 0; i < iColumnsPerRay; i++)
+                        SDL_RenderDrawLine(
+                            sdlRenderer,
+                            iHorOffset + column + i,
+                            iVerOffset + drawStart - pixelHeight * y,
+                            iHorOffset + column + i,
+                            iVerOffset + drawStart - pixelHeight * (y + 1)
+                        );
+                }
+            }
 
             #ifdef DEBUG
             if(abs(column - iColumnsCount / 2) <= iColumnsPerRay) {

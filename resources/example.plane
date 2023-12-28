@@ -1,0 +1,28 @@
+
+# Notice: order of commands hardly ever matters (and if it does it's logical)
+
+# Define world size
+# <width> <height>
+s 9       9
+# Define world tile data
+# <x0> <x1> ...         <x5>
+w 0    1    1 1 1 1 1 1 0
+w 4    0    0 0 0 0 0 0 2
+w 4    0    5 0 0 0 5 0 2
+w 4    0    0 0 0 0 0 0 2
+w 4    0    0 0 7 0 0 0 2
+w 4    0    0 0 0 0 0 0 2
+w 4    0    5 0 0 0 5 0 2
+w 4    0    0 0 0 0 0 0 2
+w 0    3    3 3 3 3 3 3 0
+# Define wall properties for tiles
+# <tileData>   <lineSlope> <lineHeight>   <domainStart> <domainEnd>   <r> <g> <b>   <textureFile>
+t 1          l 000         0000         d 0.0           1.0         c 255 000 000 x ""
+t 2          l 100         0000         d 0.0           1.0         c 000 255 000 x ""
+t 3          l 000         0001         d 0.0           1.0         c 000 000 255 x ""
+t 4          l 100         0001         d 0.0           1.0         c 255 000 255 x ""
+t 5          l 001         -0.1         d 0.5           0.6         c 255 255 000 x ""
+t 5          l -01         01.1         d 0.5           0.6         c 255 255 255 x ""
+t 5          l 001         00.1         d 0.4           0.5         c 000 255 255 x ""
+t 5          l -01         00.9         d 0.4           0.5         c 255 000 000 x ""
+t 7          l 001         00.1         d 0.0           1.0         c 255 255 255 x ""

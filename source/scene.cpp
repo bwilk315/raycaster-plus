@@ -14,6 +14,12 @@ namespace rp {
     Wall::Wall(LineEquation line, SDL_Color color) {
         this->line = line;
         this->color = color;
+        this->textureFile = "";
+    }
+    Wall::Wall(LineEquation line, SDL_Color color, const string& textureFile) {
+        this->line = line;
+        this->color = color;
+        this->textureFile = textureFile;
     }
 
     /**********************************/
@@ -28,14 +34,16 @@ namespace rp {
         this->height = 1;
         this->tiles = new int;
         this->walls = map<int, vector<Wall>>();
+        this->textures = map<string, Texture>();
     }
     Scene::Scene(int width, int height) {
         this->width = width;
         this->height = height;
         this->tiles = new int[width * height];
         this->walls = map<int, vector<Wall>>();
+        this->textures = map<string, Texture>();
     }
-    Scene::Scene(const string file) {
+    Scene::Scene(const string& file) {
         loadFromFile(file);
     }
     Scene::~Scene() {
@@ -46,6 +54,15 @@ namespace rp {
         if(walls.count(tile) == 0)
             walls.insert(pair<int, vector<Wall>>(tile, vector<Wall>()));
         walls.at(tile).push_back(wall);
+    }
+    void Scene::loadTexture(const string& file) {
+        if(textures.count(file) != 0)
+            return;
+        // Create new entry and try to load it, if failed remove it
+        textures.insert(pair<string, Texture>(file, Texture()));
+        int err = textures.at(file).loadFromFile(file);
+        if(err != Texture::E_CLEAR)
+            textures.erase(file);
     }
     bool Scene::contains(int x, int y) const {
         return (x > -1 && x < width) && (y > -1 && y < height);
@@ -61,6 +78,11 @@ namespace rp {
             if(tiles[i] > max)
                 max = tiles[i];
         return int_pair(max, (max == -1) ? (Scene::E_TILE_NOT_FOUND) : (Scene::E_CLEAR));
+    }
+    const Texture* Scene::getTexture(const string& file) const {
+        if(textures.count(file) == 0)
+            return nullptr;
+        return &textures.at(file);
     }
     int Scene::getWidth() const {
         return width;
@@ -91,6 +113,8 @@ namespace rp {
         if(!stream.good())
             return int_pair(ln, Scene::E_RPS_FAILED_TO_READ);
 
+        this->walls.clear();
+        this->textures.clear();
         string fileLine;
         int wdh = -1; // World data height (starting from top)
         while(std::getline(stream, fileLine)) {
@@ -118,7 +142,7 @@ namespace rp {
                 case '#':
                     continue;
                 // Define world size
-                case 's':
+                case 's': {
                     if(args.size() != 3)
                         return int_pair(ln, Scene::E_RPS_INVALID_ARGUMENTS_COUNT);
                     else if(!isFloat(args.at(1)) || !isFloat(args.at(2)))
@@ -128,8 +152,9 @@ namespace rp {
                     wdh = height - 1;
                     tiles = new int[width * height];
                     break;
+                }
                 // Define next world data height (counting from top)
-                case 'w':
+                case 'w': {
                     if(wdh == -1)
                         return int_pair(ln, Scene::E_RPS_OPERATION_NOT_AVAILABLE);
                     if(args.size() != width + 1)
@@ -141,9 +166,10 @@ namespace rp {
                     }
                     wdh--;
                     break;
+                }
                 // Define properties of a tile with specified data
-                case 't':
-                    if(args.size() != 12)
+                case 't': {
+                    if(args.size() != 14)
                         return int_pair(ln, Scene::E_RPS_INVALID_ARGUMENTS_COUNT);
                     else if(!(
                         isFloat(args.at(1))  && isFloat(args.at(3))  && isFloat(args.at(4))  &&
@@ -151,9 +177,16 @@ namespace rp {
                         isFloat(args.at(10)) && isFloat(args.at(11))
                     )) return int_pair(ln, Scene::E_RPS_UNKNOWN_NUMBER_FORMAT);
 
+                    string text = args.at(13);
+                    int tLen = text.length();
+                    if(tLen < 2 || text[0] != '"' || text[tLen - 1] != '"')
+                        return int_pair(ln, Scene::E_RPS_UNKNOWN_STRING_FORMAT);
+
+                    string textureFile = text.substr(1, tLen - 2); // Without double apostrophes
+                    loadTexture(textureFile);
                     addTileWall(
                         (int)stof(args.at(1)),
-                        {
+                        Wall(
                             LineEquation(
                                 stof(args.at(3)),
                                 stof(args.at(4)),
@@ -164,13 +197,16 @@ namespace rp {
                                 (Uint8)stof(args.at(9)),
                                 (Uint8)stof(args.at(10)),
                                 (Uint8)stof(args.at(11))
-                            }
-                        }
+                            },
+                            textureFile
+                        )
                     );
                     break;
-                default:
+                }
+                default: {
                     return int_pair(ln, Scene::E_RPS_OPERATION_NOT_AVAILABLE);
                     break;
+                }
             }
         }
 

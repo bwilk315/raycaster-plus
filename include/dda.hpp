@@ -29,7 +29,7 @@ namespace rp {
             Vector2 start;     // Ray starting point
             Vector2 direction; // Ray stepping direction (normalized)
 
-            Scene* scene;
+            Scene* scene = nullptr;
         public:
             const float MAX_DD = 1e30f; // Maximum delta distance for both axes
             int rayFlag;
@@ -49,7 +49,7 @@ namespace rp {
             void setTargetScene(Scene* scene);
             void setMaxTileDistance(float distance);
             float getMaxTileDistance() const;
-            Scene* getTargetScene();
+            Scene* const getTargetScene();
             /* Prepares things needed to perform the algorithm from point <start> in direction <direction>.
              * Returns two initial hits. */
             void init(const Vector2& start, const Vector2& direction);

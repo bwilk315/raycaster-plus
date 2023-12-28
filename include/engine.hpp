@@ -9,6 +9,7 @@
 #include "dda.hpp"
 #include "math.hpp"
 #include "scene.hpp"
+#include "texture.hpp"
 
 namespace rp {
     using ::std::chrono::time_point;
@@ -77,7 +78,7 @@ namespace rp {
             int getRenderHeight();
             float getElapsedTime() const;
             KeyState getKeyState(int scanCode) const;
-            DDA* getWalker();
+            DDA* const getWalker();
             SDL_Window* getWindowHandle();
             SDL_Renderer* getRendererHandle();
             bool tick();
