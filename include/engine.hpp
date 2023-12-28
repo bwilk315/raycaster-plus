@@ -43,6 +43,7 @@ namespace rp {
             float fAspectRatio;
             float fMaxTileDist;
             float fLightAngle;
+            float fStartCameraFOV;
             uint64_t frameIndex;
             RenderFitMode renderFitMode;
             time_point<system_clock> tpLast;

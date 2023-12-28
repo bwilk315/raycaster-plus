@@ -31,11 +31,13 @@ int main() {
     engine.getWalker()->setTargetScene(&scene);
     engine.getWalker()->setMaxTileDistance(MAX_TILE_DIST);
     engine.setMainCamera(&camera);
-    engine.setRenderFitMode(RenderFitMode::CHANGE_FOV); // works once
+    engine.setRenderFitMode(RenderFitMode::TRIM_SCREEN);
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
     engine.setLightBehavior(true, M_PI / 4);
     camera.setDirection(0);
+
+    SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
     bool efSunCycle = false;
     bool efBillboard = false;
@@ -48,7 +50,7 @@ int main() {
         /********** EXPERIMENTAL FEATURES **********/
 
         // Dynamic render fit mode
-        if(engine.getKeyState(SDL_SCANCODE_0) == KeyState::DOWN) { // bugged
+        if(engine.getKeyState(SDL_SCANCODE_0) == KeyState::DOWN) {
             isTrimMode = !isTrimMode;
             engine.setRenderFitMode(isTrimMode ? RenderFitMode::TRIM_SCREEN : RenderFitMode::CHANGE_FOV);
         }

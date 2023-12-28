@@ -61,13 +61,9 @@ namespace rp {
     }
     void Engine::setMainCamera(Camera* camera) {
         mainCamera = camera;
+        fStartCameraFOV = camera->getFieldOfView();
     }
     void Engine::setRenderFitMode(const RenderFitMode& rfm) {
-
-        
-        // THIS WORKS FOR THE FIRST TRY, THEN IT BEHAVES WEIRD
-
-
         renderFitMode = rfm;
         if(rfm == RenderFitMode::CHANGE_FOV) {
             // Change the camera field of view so look of the walls is perspective-correct
@@ -78,6 +74,7 @@ namespace rp {
             iVerOffset = 0;
             iColumnsCount = iScreenWidth;
         } else if(rfm == RenderFitMode::TRIM_SCREEN) {
+            mainCamera->setFieldOfView(fStartCameraFOV); // Revert default setting
             // Set up horizontal and vertical offsets for drawing columns to make the rendered
             // frame always form a square, which guarantees perspective-correct look.
             if(iScreenWidth > iScreenHeight) {

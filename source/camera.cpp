@@ -34,7 +34,9 @@ namespace rp {
     }
     void Camera::setFieldOfView(float radians) {
         fieldOfView = clamp(radians, Camera::MIN_FOV, Camera::MAX_FOV);
+        plane = plane * (1 / planeMagnitude); // Make the plane a unit vector
         planeMagnitude = tanf(radians / 2);
+        plane = plane * planeMagnitude; // Apply new magnitude of the plane vector
     }
     void Camera::setPosition(Vector2 position) {
         this->position = position;
