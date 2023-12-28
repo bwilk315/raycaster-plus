@@ -2,17 +2,6 @@
 #include <iostream>
 #include "include/engine.hpp"
 
-// Video settings
-#define SCREEN_WIDTH 1280
-#define SCREEN_HEIGHT 720
-#define LOOP_FPS 100
-#define COLS_PER_RAY 4
-#define MAX_TILE_DIST 16
-// Player settings
-#define MOVE_SPEED 2
-#define FOV_ANGLE M_PI * 0.5f
-#define TURN_SPEED M_PI * 0.04f
-
 using namespace rp;
 
 int main() {
@@ -22,37 +11,57 @@ int main() {
     if(error.second != Scene::E_CLEAR)
         return 1;
 
-    Camera camera(Vector2(3.5f, 3.5f), 0, FOV_ANGLE);
-    Engine engine(SCREEN_WIDTH, SCREEN_HEIGHT);
+    const float moveSpeed = 2;
+    const float fovAngle = M_PI / 2;
+    const float turnSpeed = M_PI * 0.04f;
+    Camera camera(Vector2(3.5f, 3.5f), 0, fovAngle);
+    Engine engine(1280, 720);
     bool lockCursor = true;
 
-    engine.setFrameRate(LOOP_FPS);
-    engine.setColumnsPerRay(COLS_PER_RAY);
-    engine.getWalker()->setTargetScene(&scene);
-    engine.getWalker()->setMaxTileDistance(MAX_TILE_DIST);
-    engine.setMainCamera(&camera);
-    engine.setRenderFitMode(RenderFitMode::TRIM_SCREEN);
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
+    engine.setColumnsPerRay(4);
+    engine.setFrameRate(60);
     engine.setLightBehavior(true, M_PI / 4);
-    camera.setDirection(0);
-
+    engine.setMainCamera(&camera);
+    engine.setWindowResize(true);
+    engine.setRenderFitMode(RenderFitMode::STRETCH);
+    engine.getWalker()->setTargetScene(&scene);
+    engine.getWalker()->setMaxTileDistance(16);
+    
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
+    bool efDynamicRFM = true;
+    bool efDynamicFOV = true;
     bool efSunCycle = false;
     bool efBillboard = false;
-    bool isTrimMode = true;
+    int fitMode = 0;
     float lightAngle = 0;
-
-
     while(engine.tick()) {
         
         /********** EXPERIMENTAL FEATURES **********/
 
         // Dynamic render fit mode
-        if(engine.getKeyState(SDL_SCANCODE_0) == KeyState::DOWN) {
-            isTrimMode = !isTrimMode;
-            engine.setRenderFitMode(isTrimMode ? RenderFitMode::TRIM_SCREEN : RenderFitMode::CHANGE_FOV);
+        if(efDynamicRFM) {
+            if(engine.getKeyState(SDL_SCANCODE_0) == KeyState::DOWN) {
+                fitMode = (++fitMode == 2) ? (0) : (fitMode);
+                engine.setRenderFitMode((RenderFitMode)fitMode);
+
+                system("clear");
+                std::cout << engine.getScreenWidth() << "x" << engine.getScreenHeight() << "\n";
+                std::cout << engine.getRenderWidth() << "x" << engine.getRenderHeight() << "\n";
+                std::cout << fitMode << "\n";
+            }
+        }
+
+        // Dynamic field of view
+        if(efDynamicFOV) {
+            if(engine.getKeyState(SDL_SCANCODE_UP) == KeyState::PRESS) {
+                camera.setFieldOfView(camera.getFieldOfView() - engine.getElapsedTime());
+            }
+            if(engine.getKeyState(SDL_SCANCODE_DOWN) == KeyState::PRESS) {
+                camera.setFieldOfView(camera.getFieldOfView() + engine.getElapsedTime());
+            }
         }
 
         // Sun-cycle
@@ -111,7 +120,7 @@ int main() {
             Vector2 camDir = camera.getDirection();
             Vector2 posChange = camDir.orthogonal() * moveInput.x + camDir * moveInput.y;
             camera.changePosition(
-                posChange * MOVE_SPEED * engine.getElapsedTime() * mag
+                posChange * moveSpeed * engine.getElapsedTime() * mag
             );
         }
 
@@ -120,16 +129,16 @@ int main() {
             // Mouse based
             int currMouseX;
             SDL_GetMouseState(&currMouseX, NULL);
-            int mouseDeltaX = currMouseX - SCREEN_WIDTH / 2;
+            int mouseDeltaX = currMouseX - engine.getScreenWidth() / 2;
             if(mouseDeltaX != 0)
-                camera.changeDirection(-1 * TURN_SPEED * mouseDeltaX * engine.getElapsedTime());
+                camera.changeDirection(-1 * turnSpeed * mouseDeltaX * engine.getElapsedTime());
         } else {
             // Keyboard based
             if(engine.getKeyState(SDL_SCANCODE_RIGHT) == KeyState::PRESS) {
-                camera.changeDirection(-1 * TURN_SPEED * engine.getElapsedTime());
+                camera.changeDirection(-1 * turnSpeed * engine.getElapsedTime());
             }
             if(engine.getKeyState(SDL_SCANCODE_LEFT) == KeyState::PRESS) {
-                camera.changeDirection(TURN_SPEED * engine.getElapsedTime());
+                camera.changeDirection(turnSpeed * engine.getElapsedTime());
             }
         }
     }

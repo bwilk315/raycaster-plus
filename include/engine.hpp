@@ -24,37 +24,41 @@ namespace rp {
         UP
     };
     enum RenderFitMode {
-        CHANGE_FOV, // Rendered frame uses the whole screen, but camera FOV is changed
-        TRIM_SCREEN // In reverse to the above: uses part of the screen but FOV is untouched
+        STRETCH, // Render gets stretched to fill the whole screen
+        SQUARE   // Render is the biggest square possible to fit with the current resolution
     };
 
     class Engine {
         private:
-            bool bRun;
+            bool bAllowWindowResize;
             bool bIsCursorLocked;
             bool bLightEnabled;
+            bool bRun;
             int iColumnsPerRay;
-            int iScreenWidth;
-            int iScreenHeight;
-            int iHorOffset;
-            int iVerOffset;
             int iColumnsCount;
             int msFrameDuration;
+            int iHorOffset;
+            int iScreenWidth;
+            int iScreenHeight;
+            int iVerOffset;
             float fAspectRatio;
-            float fMaxTileDist;
             float fLightAngle;
-            float fStartCameraFOV;
+            float fMaxTileDist;
             uint64_t frameIndex;
             RenderFitMode renderFitMode;
             time_point<system_clock> tpLast;
             duration<float> elapsedTime;
             map<int, KeyState> keyStates;
 
-            Camera* mainCamera;
+            const Camera* mainCamera = nullptr;
             DDA* walker = nullptr;
-            SDL_Window* sdlWindow;
-            SDL_Renderer* sdlRenderer;
+            SDL_Window* sdlWindow = nullptr;
+            SDL_Renderer* sdlRenderer = nullptr;
         public:
+            enum {
+                E_CLEAR,
+                E_MAIN_CAMERA_NOT_SET
+            };
 
             Engine(int screenWidth, int screenHeight);
             ~Engine();
@@ -64,10 +68,13 @@ namespace rp {
             void setColumnsPerRay(int columns);
             void setFrameRate(int framesPerSecond);
             void setLightBehavior(bool enabled, float angle);
-            void setMainCamera(Camera* camera);
-            void setRenderFitMode(const RenderFitMode& rfm);
+            void setMainCamera(const Camera* camera);
+            void setWindowResize(bool enabled);
+            int setRenderFitMode(const RenderFitMode& rfm);
             int getScreenWidth() const;
             int getScreenHeight() const;
+            int getRenderWidth();
+            int getRenderHeight();
             float getElapsedTime() const;
             KeyState getKeyState(int scanCode) const;
             DDA* getWalker();

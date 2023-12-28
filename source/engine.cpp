@@ -13,24 +13,26 @@ namespace rp {
     #endif
 
     Engine::Engine(int screenWidth, int screenHeight) {
-        this->bRun = true;
         this->bIsCursorLocked = false;
         this->bLightEnabled = false;
+        this->bRun = true;
         this->iColumnsPerRay = 4;
         this->iScreenWidth = screenWidth;
         this->iScreenHeight = screenHeight;
         this->fAspectRatio = screenHeight / (float)screenWidth;
-        this->fMaxTileDist = 16.0f;
         this->fLightAngle = 0.0f;
+        this->fMaxTileDist = 16.0f;
         this->frameIndex = 0;
         this->tpLast = system_clock::now();
         this->keyStates = map<int, KeyState>();
         this->walker = new DDA();
         setFrameRate(60);
+        setWindowResize(true);
 
         SDL_InitSubSystem(SDL_INIT_VIDEO);
         SDL_CreateWindowAndRenderer(screenWidth, screenHeight, SDL_WINDOW_SHOWN, &this->sdlWindow, &this->sdlRenderer);
         SDL_SetWindowTitle(this->sdlWindow, "Raycaster Plus Engine");
+        SDL_SetWindowResizable(this->sdlWindow, SDL_TRUE);
     }
     Engine::~Engine() {
         SDL_DestroyWindow(sdlWindow);
@@ -50,49 +52,60 @@ namespace rp {
         SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE);
     }
     void Engine::setColumnsPerRay(int columns) {
-        iColumnsPerRay = columns;
+        iColumnsPerRay = clamp(columns, 1, iScreenWidth);
     }
     void Engine::setFrameRate(int framesPerSecond) {
-        msFrameDuration = 1000 / framesPerSecond;
+        msFrameDuration = 1000 / clamp(framesPerSecond, 1, 1000);
     }
     void Engine::setLightBehavior(bool enabled, float angle) {
         bLightEnabled = enabled;
         fLightAngle = angle;
     }
-    void Engine::setMainCamera(Camera* camera) {
+    void Engine::setMainCamera(const Camera* camera) {
         mainCamera = camera;
-        fStartCameraFOV = camera->getFieldOfView();
     }
-    void Engine::setRenderFitMode(const RenderFitMode& rfm) {
+    void Engine::setWindowResize(bool enabled) {
+        bAllowWindowResize = enabled;
+        SDL_SetWindowResizable(sdlWindow, (SDL_bool)enabled);
+    }
+    int Engine::setRenderFitMode(const RenderFitMode& rfm) {
+        if(mainCamera == nullptr)
+            return Engine::E_MAIN_CAMERA_NOT_SET;
+        
         renderFitMode = rfm;
-        if(rfm == RenderFitMode::CHANGE_FOV) {
-            // Change the camera field of view so look of the walls is perspective-correct
-            // I do things using the fact that if you are 1/2 from the wall then with 90deg
-            // FOV your screen height would be used completely.
-            mainCamera->setFieldOfView(2 * atan(1 / fAspectRatio));
-            iHorOffset = 0;
-            iVerOffset = 0;
-            iColumnsCount = iScreenWidth;
-        } else if(rfm == RenderFitMode::TRIM_SCREEN) {
-            mainCamera->setFieldOfView(fStartCameraFOV); // Revert default setting
-            // Set up horizontal and vertical offsets for drawing columns to make the rendered
-            // frame always form a square, which guarantees perspective-correct look.
-            if(iScreenWidth > iScreenHeight) {
-                iHorOffset = (iScreenWidth - iScreenHeight) / 2;
-                iVerOffset = 0;
-                iColumnsCount = iScreenHeight;
-            } else {
+        switch(rfm) {
+            case RenderFitMode::STRETCH:
                 iHorOffset = 0;
-                iVerOffset = (iScreenHeight - iScreenWidth) / 2;
+                iVerOffset = 0;
                 iColumnsCount = iScreenWidth;
-            }
+                break;
+            case RenderFitMode::SQUARE:
+                // Set up horizontal and vertical offsets for drawing columns to make the rendered
+                // frame always form a square.
+                if(iScreenWidth > iScreenHeight) {
+                    iHorOffset = (iScreenWidth - iScreenHeight) / 2;
+                    iVerOffset = 0;
+                    iColumnsCount = iScreenHeight;
+                } else {
+                    iHorOffset = 0;
+                    iVerOffset = (iScreenHeight - iScreenWidth) / 2;
+                    iColumnsCount = iScreenWidth;
+                }
+                break;
         }
+        return Engine::E_CLEAR;
     }
     int Engine::getScreenWidth() const {
         return iScreenWidth;
     }
     int Engine::getScreenHeight() const {
         return iScreenHeight;
+    }
+    int Engine::getRenderWidth() {
+        return (renderFitMode == RenderFitMode::STRETCH) ? (iScreenWidth) : (iColumnsCount);
+    }
+    int Engine::getRenderHeight() {
+        return (renderFitMode == RenderFitMode::STRETCH) ? (iScreenHeight) : (iColumnsCount);
     }
     float Engine::getElapsedTime() const {
         return elapsedTime.count();
@@ -141,6 +154,12 @@ namespace rp {
                     sc = event.key.keysym.scancode;
                     if(keyStates.count(sc) != 0)
                         keyStates.at(sc) = KeyState::UP;
+                    break;
+                case SDL_WINDOWEVENT:
+                    if(event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+                        SDL_GetWindowSizeInPixels(sdlWindow, &iScreenWidth, &iScreenHeight);
+                        setRenderFitMode(renderFitMode); // Refresh fit mode to let it adapt to new resolution
+                    }
                     break;
             }
         }
@@ -307,9 +326,9 @@ namespace rp {
 
             // Display the ray by drawing an appropriate vertical strip, with settings appropriate
             // for the current render fit mode.
-            int renderHeight = (renderFitMode == RenderFitMode::CHANGE_FOV) ? (iScreenHeight) : (iColumnsCount);
+            int renderHeight = getRenderHeight();
             float refDist = 1 / (2 * tanf(mainCamera->getFieldOfView() / 2));
-            int lineHeight = (renderHeight / nwDistance * refDist) / ((renderFitMode == RenderFitMode::CHANGE_FOV) ? (fAspectRatio) : (1));
+            int lineHeight = renderHeight * (1 / (nwDistance / refDist));
 
             int drawStart = renderHeight / 2 - lineHeight / 2;
             int drawEnd = renderHeight / 2 + lineHeight / 2;
