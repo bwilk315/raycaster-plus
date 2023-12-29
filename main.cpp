@@ -7,7 +7,7 @@ using namespace rp;
 
 int main() {
     Scene scene;
-    int_pair error = scene.loadFromFile("resources/generated.plane");
+    int_pair error = scene.loadFromFile("resources/example.plane");
     std::cout << error.first << ", " << error.second << std::endl;
     if(error.second != Scene::E_CLEAR)
         return 1;
@@ -35,7 +35,7 @@ int main() {
     bool efDynamicRFM = true;
     bool efDynamicFOV = true;
     bool efSunCycle = false;
-    bool efBillboard = true;
+    bool efBillboard = false;
     int fitMode = 0;
     float lightAngle = 0;
     while(engine.tick()) {

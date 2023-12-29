@@ -299,6 +299,8 @@ namespace rp {
                             isNormalFlipped = true;
                         }
 
+
+                        // THERE IS A PROBLRM EITH PERFECT LINE EQUATIONS!!!
                         if(!originDone && rayDir.dot(normal) > 0)
                             continue;
 
