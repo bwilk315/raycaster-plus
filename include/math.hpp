@@ -17,15 +17,12 @@ namespace rp {
     using ::std::string;
     using ::std::sqrt;
     using ::std::abs;
-    
-    extern const float EI_TOL;
 
     class LinearFunc;
     class Vector2;
 
     bool isFloat(const string& str);
     int digitCount(int n);
-    int ensureInteger(float n);
     float clamp(float value, float min, float max);
 
     struct LinearFunc {

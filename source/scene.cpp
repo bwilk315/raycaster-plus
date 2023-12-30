@@ -29,7 +29,14 @@ namespace rp {
         updateBoundaryPoints();
     }
     void WallDetails::updateBoundaryPoints() {
-        bp0.x = func.slope == 0 ? 0 : (-1 * func.height / func.slope);
+        if(func.slope == 0) {
+            bp0.x = 0;
+            bp0.y = func.height;
+            bp1.x = 1;
+            bp1.y = func.height;
+            return;
+        }
+        bp0.x = -1 * func.height / func.slope;
         if(bp0.x < 0) {
             bp0.x = 0;
             bp0.y = func.height;
@@ -234,8 +241,8 @@ namespace rp {
                         -1, // Enforce new wall entry creation (to not override existing ones)
                         WallDetails(
                             LinearFunc(
-                                stof(args.at(3)),
-                                stof(args.at(4)),
+                                clamp(stof(args.at(3)), -1 * LinearFunc::MAX_SLOPE, LinearFunc::MAX_SLOPE),
+                                clamp(stof(args.at(4)), -1 * LinearFunc::MAX_SLOPE + 1, LinearFunc::MAX_SLOPE - 1),
                                 stof(args.at(6)),
                                 stof(args.at(7)),
                                 stof(args.at(8)),

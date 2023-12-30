@@ -29,14 +29,14 @@ int main() {
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(8);
+    engine.setColumnsPerRay(2);
     engine.setFrameRate(60);
     engine.setLightBehavior(true, M_PI / 4);
     engine.setMainCamera(&camera);
     engine.setWindowResize(true);
     engine.setRenderFitMode(RenderFitMode::SQUARE);
     engine.getWalker()->setTargetScene(&scene);
-    engine.getWalker()->setMaxTileDistance(16);
+    engine.getWalker()->setMaxTileDistance(6);
     
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
@@ -139,11 +139,6 @@ int main() {
                 posChange * moveSpeed * engine.getElapsedTime() * mag
             );
         }
-
-        #ifdef DEBUG
-        system("clear");
-        std::cout << mag << std::endl;
-        #endif
 
         // Camera rotation
         if(lockCursor) {

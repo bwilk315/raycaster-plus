@@ -22,6 +22,7 @@ namespace rp {
     using ::std::pair;
     using ::std::ifstream;
     using ::std::stof;
+    using ::std::abs;
 
     typedef pair<int, int> int_pair;
 

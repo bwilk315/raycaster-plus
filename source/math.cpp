@@ -23,11 +23,6 @@ namespace rp {
         if(n < 0) digits++; // Include the minus sign
         return ((n < 0) ? (1) : (0)) + digits;
     }
-    int ensureInteger(float n) {
-        // This simple function kills all demons that output integer while it is not a one, for example
-        // take number 4.999999(...), C++ tells me that it is 5, so I evaluate (int)5 and get 4 ... bruh!
-        return ((int)(n + EI_TOL) > (int)n) ? (ceilf(n)) : (floorf(n));
-    }
     float clamp(float value, float min, float max) {
         return (value < min) ? (min) : ((value > max) ? (max) : (value));
     }
@@ -36,7 +31,7 @@ namespace rp {
     /********** STRUCTURE: LINEAR FUNCTION ******/
     /********************************************/
 
-    const float LinearFunc::MAX_SLOPE = 100;
+    const float LinearFunc::MAX_SLOPE = 1e4;
 
     LinearFunc::LinearFunc() {
         this->slope = 0;
@@ -65,8 +60,6 @@ namespace rp {
         return abs(slope * point.x - point.y + height) / sqrt(slope * slope + 1);
     }
     Vector2 LinearFunc::getCommonPoint(const LinearFunc& other) const {
-        if(this->slope >= LinearFunc::MAX_SLOPE) // Additional ensurance is effective
-            return Vector2(this->height, other.getValue(this->height));
         float x = (this->height - other.height) / (other.slope - this->slope);
         return Vector2(x, getValue(x));
     }

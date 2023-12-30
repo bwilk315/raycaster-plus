@@ -224,12 +224,8 @@ namespace rp {
             // the nearest wall of the nearest tile.
             walker->init(camPos, rayDir);
             bool originDone = false; // Whether walls from the origin were examined
-
-            #ifdef DEBUG
-                if(column == iColumnsCount / 2) {
-                    system("clear");
-                }
-            #endif
+            int renderHeight = getRenderHeight();
+            Color pixelsBuffer[renderHeight];
 
             while(true) {
                 RayHitInfo hit = originDone ? walker->next() : simulateBoundaryEnter(camPos, rayDir);
@@ -241,82 +237,73 @@ namespace rp {
                 else if(!(walker->rayFlag & DDA::RF_HIT))
                     continue;           
 
-                int tileData = mainScene->getTileData(hit.tile.x, hit.tile.y);
-                bool fromSide = walker->rayFlag & DDA::RF_SIDE;
-
                 // Update the ray line intercept according to the ray hit point
                 float rayIntX;
                 float rayIntY;
-                if(fromSide) {
+                if(walker->rayFlag & DDA::RF_SIDE) {
                     rayIntY = hit.point.y - (int)hit.point.y;
                     rayIntX = rayDir.x < 0;
                 } else {
                     rayIntX = hit.point.x - (int)hit.point.x;
                     rayIntY = rayDir.y < 0;
                 }
-                rayLine.height = rayIntY - rayLine.slope * rayIntX; // Total intercept
+                rayLine.height = rayIntY - rayLine.slope * rayIntX;
 
                 // Find the nearest wall in the obtained non-air tile
+                int tileData = mainScene->getTileData(hit.tile.x, hit.tile.y);
+
                 for(const WallDetails& wd : mainScene->getTileWalls(tileData)) {
-                    const LinearFunc* line = &wd.func; // For convienence
-                    if(line->xMin == line->xMax) // It will not be seen anyway
-                        continue;
 
                     // Find intersection point of line defining current wall geometry and the ray line
-                    Vector2 inter = line->getCommonPoint(rayLine);
+                    Vector2 inter = wd.func.getCommonPoint(rayLine);
                     if((inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) ||
-                       (inter.x < line->xMin || inter.x > line->xMax)) {
+                       (inter.x < wd.func.xMin || inter.x > wd.func.xMax) ||
+                       (inter.y < wd.func.yMin || inter.y > wd.func.yMax)) {
                         // Intersection point is out of tile or domain bounds, skip it then
                         continue;
-                    } else {
-                        // Intersection point is defined in specified bounds, process it
-
-                        // Find normal vector that always points out of the wall plane
-                        bool isNormalFlipped = false;
-                        float normAngle = (line->slope == 0) ? (-1 * M_PI_2) : (atanf(1 / line->slope * -1));
-                        float globalPosInterY = line->slope * (camPos.x - hit.tile.x) + line->height + hit.tile.y;
-                        Vector2 normal = (Vector2::RIGHT).rotate(normAngle);
-                        if( (line->slope >= 0 && camPos.y > globalPosInterY) || // If camera is above the line or below
-                            (line->slope  < 0 && camPos.y < globalPosInterY)) { // it, normal needs to be flipped.
-                            normal = normal * -1;
-                            isNormalFlipped = true;
-                        }
-
-                        // THERE IS A PROBLRM EITH PERFECT LINE EQUATIONS!!!
-                        if(!originDone && rayDir.dot(normal) > 0)
-                            continue;
-
-                        Vector2 tilePos = Vector2(
-                            ensureInteger(hit.point.x), // Ensuring integers prevents them from flipping suddenly,
-                            ensureInteger(hit.point.y)  // for example: it makes 5.9999 -> 6 and 6.0001 -> 6.
-                        );
-                        tilePos.x -= ( fromSide && rayDir.x < 0) ? (1) : (0);
-                        tilePos.y -= (!fromSide && rayDir.y < 0) ? (1) : (0);
-                        // Perpendicular distance from wall intersection point (global) to the camera plane
-                        float pointDist = planeLine.getDistanceFromPoint(tilePos + inter);
-                        if(pointDist < nwDistance) {
-                            // New nearest wall found, save its information
-                            
-                            // Save the new nearest wall information
-                            nwTileData    = tileData;
-                            nwDistance    = pointDist;
-                            nwColor       = wd.tint;
-                            nwNormal      = normal;
-                            nwTexId = wd.texId;
-
-                            // Compute normalized horizontal position on the wall plane
-                            float wallLength = (wd.bp1 - wd.bp0).magnitude();
-                            float wallPlaneX = ((isNormalFlipped ? wd.bp1 : wd.bp0) - inter).magnitude();
-                            nwPlaneNormX = wallPlaneX / wallLength;
-
-                            #ifdef DEBUG
-                            if(column == iColumnsCount / 2) {
-                                cout << wallLength << ", " << wallPlaneX << endl;
-                            }
-                            #endif
-                        }
-                        nwExists = true;
                     }
+                    // Intersection point is defined in specified bounds, process it
+
+                    // Find normal vector that always points out of the wall plane
+                    bool isNormalFlipped = false;
+                    float normAngle = (wd.func.slope == 0) ? (-1 * M_PI_2) : (atanf(1 / wd.func.slope * -1));
+                    float globalPosInterY = wd.func.getValue(camPos.x - hit.tile.x) + hit.tile.y;
+                    Vector2 normal = (Vector2::RIGHT).rotate(normAngle);
+                    if( (wd.func.slope >= 0 && camPos.y > globalPosInterY) || // If camera is above the line or below
+                        (wd.func.slope  < 0 && camPos.y < globalPosInterY)) { // it, normal needs to be flipped.
+                        normal = normal * -1;
+                        isNormalFlipped = true;
+                    }
+
+                    // THERE IS A PROBLRM EITH PERFECT LINE EQUATIONS!!!
+                    if(!originDone && rayDir.dot(normal) > 0)
+                        continue;
+
+                    #ifdef DEBUG
+                    // if(column == iColumnsCount / 2) {
+                    //     system("clear");
+                    //     cout << wd.bp0 << ", " << wd.bp1 << "\n";
+                    // }
+                    #endif
+
+                    // Perpendicular distance from wall intersection point (global) to the camera plane
+                    float pointDist = planeLine.getDistanceFromPoint(hit.tile + inter);
+                    if(pointDist < nwDistance) {
+                        // New nearest wall found, save its information
+                        
+                        // Save the new nearest wall information
+                        nwTileData    = tileData;
+                        nwDistance    = pointDist;
+                        nwColor       = wd.tint;
+                        nwNormal      = normal;
+                        nwTexId = wd.texId;
+
+                        // Compute normalized horizontal position on the wall plane
+                        float wallLength = (wd.bp1 - wd.bp0).magnitude();
+                        float wallPlaneX = ((isNormalFlipped ? wd.bp1 : wd.bp0) - inter).magnitude();
+                        nwPlaneNormX = wallPlaneX / wallLength;
+                    }
+                    nwExists = true;
                 }
                 
                 originDone = true;
@@ -336,7 +323,6 @@ namespace rp {
 
             // Display the ray by drawing an appropriate vertical strip, with settings appropriate
             // for the current render fit mode.
-            int renderHeight = getRenderHeight();
             float refDist = 1 / (2 * tanf(mainCamera->getFieldOfView() / 2));
             int lineHeight = renderHeight * (1 / (nwDistance / refDist));
             int drawStart = renderHeight / 2 + lineHeight / 2;
@@ -395,8 +381,10 @@ namespace rp {
         }
 
         #ifdef DEBUG
-        // system("clear");
-        // cout << "Frames per second: " << (1.0f / getElapsedTime()) << "\n";
+        if(frameIndex % msFrameDuration == 0) {
+            system("clear");
+            cout << "Frames per second: " << (1.0f / getElapsedTime()) << "\n";
+        }
         #endif
 
         if(bIsCursorLocked)
