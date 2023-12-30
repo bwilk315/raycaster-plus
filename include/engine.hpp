@@ -2,6 +2,9 @@
 #ifndef _ENGINE_HPP
 #define _ENGINE_HPP
 
+#ifdef DEBUG
+#include <iostream>
+#endif
 #include <map>
 #include <chrono>
 #include <SDL2/SDL.h>
@@ -55,6 +58,8 @@ namespace rp {
             DDA* walker = nullptr;
             SDL_Window* sdlWindow = nullptr;
             SDL_Renderer* sdlRenderer = nullptr;
+
+            RayHitInfo simulateBoundaryEnter(const Vector2& pos, const Vector2& dir);
         public:
             enum {
                 E_CLEAR,

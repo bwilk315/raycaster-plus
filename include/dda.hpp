@@ -2,11 +2,16 @@
 #ifndef _DDA_HPP
 #define _DDA_HPP
 
+#ifdef DEBUG
+#include <iostream>
+#endif
 #include "scene.hpp"
 #include "math.hpp"
 
 namespace rp {
+    #ifdef DEBUG
     using ::std::ostream;
+    #endif
 
     struct RayHitInfo {
         float distance;
@@ -16,7 +21,9 @@ namespace rp {
         RayHitInfo();
         RayHitInfo(float distance, Vector2 tile, Vector2 point);
     };
+    #ifdef DEBUG
     ostream& operator<<(ostream& stream, const RayHitInfo& hit);
+    #endif
 
     class DDA {
         private:
@@ -49,13 +56,16 @@ namespace rp {
             void setTargetScene(Scene* scene);
             void setMaxTileDistance(float distance);
             float getMaxTileDistance() const;
-            Scene* const getTargetScene();
+            const Scene* const getTargetScene() const;
             /* Prepares things needed to perform the algorithm from point <start> in direction <direction>.
              * Returns two initial hits. */
             void init(const Vector2& start, const Vector2& direction);
             /* Performs one step resulting in hitting some tile, information about the hit is returned. */
             RayHitInfo next();
     };
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const DDA& dda);
+    #endif
 }
 
 #endif

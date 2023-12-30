@@ -53,4 +53,11 @@ namespace rp {
     Vector2 Camera::getDirection() const {
         return direction;
     }
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const Camera& cam) {
+        stream << "Camera(fieldOfView=" << cam.getFieldOfView() << ", plane=" << cam.getPlane();
+        stream << ", position=" << cam.getPosition() << ", direction=" << cam.getDirection() << ")";
+        return stream;
+    }
+    #endif
 }

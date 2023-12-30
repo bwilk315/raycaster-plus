@@ -1,6 +1,5 @@
 
 #include <iostream>
-#include <png.h>
 #include "include/engine.hpp"
 
 using namespace rp;
@@ -12,16 +11,25 @@ int main() {
     if(error.second != Scene::E_CLEAR)
         return 1;
 
+    // #ifdef DEBUG
+    // for(const auto& wd : scene.getTileWalls(7)) {
+    //     std::cout << wd << std::endl;
+    // }
+
+    // return 0;
+    // #endif
+
+    const float invSqrt2 = 1 / sqrt(2);
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
     const float turnSpeed = M_PI * 0.04f;
-    Camera camera(Vector2(3.5f, 3.5f), 0, fovAngle);
-    Engine engine(1280, 720);
+    Camera camera(Vector2(6.01f, 6.01f), 0, fovAngle);
+    Engine engine(720, 720);
     bool lockCursor = true;
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(4);
+    engine.setColumnsPerRay(8);
     engine.setFrameRate(60);
     engine.setLightBehavior(true, M_PI / 4);
     engine.setMainCamera(&camera);
@@ -91,13 +99,16 @@ int main() {
             float x2 = (-1 * b + sqrtf(delta)) / (2.0f * a);
             x1 = 0; // for amogus
             x2 = 1;
-            engine.getWalker()->getTargetScene()->setTileWall(
+            scene.setTileWall(
                 5,
                 0,
-                Wall(
-                    LineEquation(slope, intercept, x1 < x2 ? x1 : x2, x1 > x2 ? x1 : x2),
+                WallDetails(
+                    LinearFunc(slope, intercept, x1 < x2 ? x1 : x2, x1 > x2 ? x1 : x2),
                     { 255, 128, 64},
-                    "resources/amogus.png"
+                    0,
+                    1,
+                    0,
+                    1
                 )
             );
         }
@@ -120,7 +131,7 @@ int main() {
         if(engine.getKeyState(SDL_SCANCODE_S) == KeyState::PRESS) moveInput.y += -1;
         if(engine.getKeyState(SDL_SCANCODE_D) == KeyState::PRESS) moveInput.x += 1;
         if(engine.getKeyState(SDL_SCANCODE_A) == KeyState::PRESS) moveInput.x += -1;
-        float mag = moveInput.normalized().magnitude();
+        float mag = (moveInput.x != 0 && moveInput.y != 0) ? invSqrt2 : 1;
         if(mag != 0) {
             Vector2 camDir = camera.getDirection();
             Vector2 posChange = camDir.orthogonal() * moveInput.x + camDir * moveInput.y;
@@ -128,6 +139,11 @@ int main() {
                 posChange * moveSpeed * engine.getElapsedTime() * mag
             );
         }
+
+        #ifdef DEBUG
+        system("clear");
+        std::cout << mag << std::endl;
+        #endif
 
         // Camera rotation
         if(lockCursor) {

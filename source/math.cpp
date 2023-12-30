@@ -32,43 +32,51 @@ namespace rp {
         return (value < min) ? (min) : ((value > max) ? (max) : (value));
     }
 
-    /******************************************/
-    /********** STRUCTURE: LINE EQUATION ******/
-    /******************************************/
+    /********************************************/
+    /********** STRUCTURE: LINEAR FUNCTION ******/
+    /********************************************/
 
-    const float LineEquation::MAX_SLOPE = 100.0f;
+    const float LinearFunc::MAX_SLOPE = 100;
 
-    LineEquation::LineEquation() {
+    LinearFunc::LinearFunc() {
         this->slope = 0;
         this->height = 0;
-        this->domainStart = 0;
-        this->domainEnd = 0;
+        this->xMin = 0;
+        this->xMax = 1;
+        this->yMin = 0;
+        this->yMax = 1;
     }
-    LineEquation::LineEquation(float slope, float height, float domainStart, float domainEnd) {
+    LinearFunc::LinearFunc(float slope, float height) : LinearFunc() {
         this->slope = slope;
         this->height = height;
-        this->domainStart = domainStart;
-        this->domainEnd = domainEnd;
     }
-    float LineEquation::pointDistance(const Vector2& point) {
+    LinearFunc::LinearFunc(float slope, float height, float xMin, float xMax) : LinearFunc(slope, height) {
+        this->xMin = xMin;
+        this->xMax = xMax;
+    }
+    LinearFunc::LinearFunc(float slope, float height, float xMin, float xMax, float yMin, float yMax) : LinearFunc(slope, height, xMin, xMax) {
+        this->yMin = yMin;
+        this->yMax = yMax;
+    }
+    float LinearFunc::getValue(float argument) const {
+        return slope * argument + height;
+    }
+    float LinearFunc::getDistanceFromPoint(const Vector2& point) const {
         return abs(slope * point.x - point.y + height) / sqrt(slope * slope + 1);
     }
-    Vector2 LineEquation::intersection(const LineEquation& other) const {
-        // When current line is very vertical
-        if(this->slope >= LineEquation::MAX_SLOPE)
-            return Vector2(this->height, other.slope * this->height + other.height);
-        // Any other scenario
+    Vector2 LinearFunc::getCommonPoint(const LinearFunc& other) const {
+        if(this->slope >= LinearFunc::MAX_SLOPE) // Additional ensurance is effective
+            return Vector2(this->height, other.getValue(this->height));
         float x = (this->height - other.height) / (other.slope - this->slope);
-        return Vector2(x, this->slope * x + this->height);
+        return Vector2(x, getValue(x));
     }
-    Vector2 LineEquation::operator&&(const LineEquation& other) const {
-        return intersection(other);
-    }
-    ostream& operator<<(ostream& stream, const LineEquation& line) {
-        stream << "LineEquation(slope=" << line.slope << ", height=" << line.height;
-        stream << ", domainStart=" << line.domainStart << ", domainEnd=" << line.domainEnd << ")";
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const LinearFunc& func) {
+        stream << "LinearFunc(slope=" << func.slope << ", height=" << func.height << ", xMin=" << func.xMin;
+        stream << ", xMax=" << func.xMax << ", yMin=" << func.yMin << ", yMax=" << func.yMax << ")";
         return stream;
     }
+    #endif
 
     /*************************************************/
     /********** STRUCTURE: 2-DIMENSIONAL VECTOR ******/
@@ -89,17 +97,14 @@ namespace rp {
         this->y = y;
     }
     float Vector2::dot(const Vector2& other) const {
-        return x * other.x + y * other.y;
+        return this->x * other.x + this->y * other.y;
     }
     float Vector2::magnitude() const {
         return sqrtf(x * x + y * y);
     }
-    Vector2 Vector2::add(const Vector2& other) const {
-        return Vector2(x + other.x, y + other.y);
-    }
     Vector2 Vector2::normalized() const {
         float mag = magnitude();
-        return scale((mag == 0) ? (0) : (1 / mag));
+        return mag == 0 ? Vector2::ZERO : Vector2(x / mag, y / mag);
     }
     Vector2 Vector2::orthogonal() const {
         return Vector2(y, -1 * x);
@@ -107,28 +112,24 @@ namespace rp {
     Vector2 Vector2::rotate(float radians) const {
         float sin = sinf(radians);
         float cos = cosf(radians);
-        return Vector2(
-            cos * x - sin * y,
-            sin * x + cos * y
-        );
-    }
-    Vector2 Vector2::scale(float scalar) const {
-        return Vector2(x * scalar, y * scalar);
-    }
-    float Vector2::operator*(const Vector2& other) const {
-        return dot(other);
+        return Vector2(cos * x - sin * y, sin * x + cos * y);
     }
     Vector2 Vector2::operator+(const Vector2& other) const {
-        return add(other);
+        return Vector2(this->x + other.x, this->y + other.y);
     }
     Vector2 Vector2::operator-(const Vector2& other) const {
-        return add(other.scale(-1));
+        return Vector2(this->x - other.x, this->y - other.y);
     }
     Vector2 Vector2::operator*(const float scalar) const {
-        return scale(scalar);
+        return Vector2(x * scalar, y * scalar);
     }
+    Vector2 Vector2::operator/(const float scalar) const {
+        return Vector2(x / scalar, y / scalar);
+    }
+    #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Vector2& vec) {
         stream << "Vector2(x=" << vec.x << ", y=" << vec.y << ")";
         return stream;
     }
+    #endif
 }

@@ -19,10 +19,12 @@ namespace rp {
         this->tile = tile;
         this->point = point;
     }
+    #ifdef DEBUG
     ostream& operator<<(ostream& stream, const RayHitInfo& hit) {
         stream << "RayHitInfo(distance=" << hit.distance << ", tile=" << hit.tile << ", point=" << hit.point << ")";
         return stream;
     }
+    #endif
 
     /******************************************************/
     /********** CLASS: DIGITAL DIFFERENTIAL ANALYSIS ******/
@@ -45,7 +47,7 @@ namespace rp {
     float DDA::getMaxTileDistance() const {
         return maxTileDist;
     }
-    Scene* const DDA::getTargetScene() {
+    const Scene* const DDA::getTargetScene() const {
         return scene;
     }
     void DDA::init(const Vector2& start, const Vector2& direction) {
@@ -99,14 +101,13 @@ namespace rp {
             return RayHitInfo();
         }
         // Check if hit tile is not outside the plane
-        int_pair p = scene->getTileData(planePosX, planePosY);
-        if(p.second != Scene::E_CLEAR || !scene->contains(planePosX, planePosY)) {
+        if(!scene->checkPosition(planePosX, planePosY)) {
             rayFlag = DDA::RF_OUTSIDE;
             return RayHitInfo();
         }
 
         // If tile data is not zero, then ray hit this tile
-        int tileData = p.first;
+        int tileData = scene->getTileData(planePosX, planePosY);
         if(tileData != 0) {
             float distance = (rayFlag == DDA::RF_SIDE) ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
             rayFlag |= DDA::RF_HIT;
@@ -120,5 +121,11 @@ namespace rp {
         rayFlag = DDA::RF_CLEAR;
         return RayHitInfo();
     }
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const DDA& dda) {
+        stream << "DDA(rayFlag=" << dda.rayFlag << ", maxTileDist=" << dda.getMaxTileDistance() << ", scene=";
+        stream << dda.getTargetScene() << ")";
+        return stream;
+    }
+    #endif
 }
-

@@ -1,21 +1,26 @@
 
-#ifndef _RMATH_HPP
-#define _RMATH_HPP
+#ifndef _RP_MATH_HPP
+#define _RP_MATH_HPP
 
+#ifdef DEBUG
+#include <iostream>
+#endif
 #include <vector>
 #include <string>
 #include <sstream>
 #include <cmath>
 
 namespace rp {
-    using ::std::string;
+    #ifdef DEBUG
     using ::std::ostream;
+    #endif
+    using ::std::string;
     using ::std::sqrt;
     using ::std::abs;
     
     extern const float EI_TOL;
 
-    class LineEquation;
+    class LinearFunc;
     class Vector2;
 
     bool isFloat(const string& str);
@@ -23,22 +28,26 @@ namespace rp {
     int ensureInteger(float n);
     float clamp(float value, float min, float max);
 
-    struct LineEquation {
+    struct LinearFunc {
         static const float MAX_SLOPE;
 
         float slope;
         float height;
-        float domainStart;
-        float domainEnd;
+        float xMin, xMax;
+        float yMin, yMax;
 
-        LineEquation();
-        LineEquation(float slope, float intercept, float domainStart, float domainEnd);
-        float pointDistance(const Vector2& point);
-        // Having one kinda vertical line, use it as the method host to make it work
-        Vector2 intersection(const LineEquation& other) const;
-        Vector2 operator&&(const LineEquation& other) const;
+        LinearFunc();
+        LinearFunc(float slope, float height);
+        LinearFunc(float slope, float height, float xMin, float xMax);
+        LinearFunc(float slope, float height, float xMin, float xMax, float yMin, float yMax);
+
+        float getValue(float argument) const;
+        float getDistanceFromPoint(const Vector2& point) const;
+        Vector2 getCommonPoint(const LinearFunc& other) const;
     };
-    ostream& operator<<(ostream& stream, const LineEquation& line);
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const LinearFunc& func);
+    #endif
 
     struct Vector2 {
         static const Vector2 ZERO;
@@ -51,20 +60,21 @@ namespace rp {
 
         Vector2();
         Vector2(float x, float y);
+
         float dot(const Vector2& other) const;
         float magnitude() const;
-        Vector2 add(const Vector2& other) const;
         Vector2 normalized() const;
         Vector2 orthogonal() const;
         Vector2 rotate(float radians) const;
-        Vector2 scale(float scalar) const;
 
-        float operator*(const Vector2& other) const;
         Vector2 operator+(const Vector2& other) const;
         Vector2 operator-(const Vector2& other) const;
         Vector2 operator*(const float scalar) const;
+        Vector2 operator/(const float scalar) const;
     };
+    #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Vector2& vec);
+    #endif
 }
 
 #endif

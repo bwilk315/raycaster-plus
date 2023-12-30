@@ -1,10 +1,16 @@
 
-#ifndef _CAMERA_HPP
-#define _CAMERA_HPP
+#ifndef _RP_CAMERA_HPP
+#define _RP_CAMERA_HPP
 
+#ifdef DEBUG
+#include <iostream>
+#endif
 #include "math.hpp"
 
 namespace rp {
+    #ifdef DEBUG
+    using ::std::ostream;
+    #endif
     using ::std::abs;
 
     class Camera {
@@ -21,16 +27,19 @@ namespace rp {
 
             Camera();
             Camera(Vector2 position, float viewAngle, float fieldOfView);
+            float getFieldOfView() const;
+            Vector2 getPlane() const;
+            Vector2 getPosition() const;
+            Vector2 getDirection() const;
             void changeDirection(float radians);
             void changePosition(Vector2 change);
             void setDirection(float radians);
             void setFieldOfView(float radians);
             void setPosition(Vector2 position);
-            float getFieldOfView() const;
-            Vector2 getPlane() const;
-            Vector2 getPosition() const;
-            Vector2 getDirection() const;
     };
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const Camera& cam);
+    #endif
 }
 
 #endif
