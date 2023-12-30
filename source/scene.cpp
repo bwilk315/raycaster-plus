@@ -147,8 +147,10 @@ namespace rp {
         // Add a new texture entry, if loading failed then erase it, returns the texture ID
         uint16_t id = cachedFiles.size() + 1;
         textures.insert(pair<uint16_t, Texture>(id, Texture()));
-        if(textures.at(id).loadFromFile(file) == Texture::E_CLEAR)
+        if(textures.at(id).loadFromFile(file) == Texture::E_CLEAR) {
+            cachedFiles.insert(pair<string, int>(file, id));
             return id;
+        }
         textures.erase(id);
         return Scene::INVALID_ID;
     }

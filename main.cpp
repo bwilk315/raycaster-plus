@@ -23,20 +23,20 @@ int main() {
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
     const float turnSpeed = M_PI * 0.04f;
-    Camera camera(Vector2(6.01f, 6.01f), 0, fovAngle);
+    Camera camera(Vector2(11.5f, 11.5f), 0, fovAngle);
     Engine engine(720, 720);
     bool lockCursor = true;
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(2);
-    engine.setFrameRate(60);
+    engine.setColumnsPerRay(1);
+    engine.setFrameRate(30);
     engine.setLightBehavior(true, M_PI / 4);
     engine.setMainCamera(&camera);
     engine.setWindowResize(true);
     engine.setRenderFitMode(RenderFitMode::SQUARE);
     engine.getWalker()->setTargetScene(&scene);
-    engine.getWalker()->setMaxTileDistance(6);
+    engine.getWalker()->setMaxTileDistance(24);
     
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
