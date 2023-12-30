@@ -22,21 +22,21 @@ int main() {
     const float invSqrt2 = 1 / sqrt(2);
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
-    const float turnSpeed = M_PI * 0.04f;
-    Camera camera(Vector2(11.5f, 11.5f), 0, fovAngle);
+    float turnSpeed = M_PI * 0.66f;
+    Camera camera(Vector2(11.5f, 36.5f), -M_PI/2, fovAngle);
     Engine engine(720, 720);
-    bool lockCursor = true;
+    bool lockCursor = false;
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(1);
-    engine.setFrameRate(30);
+    engine.setColumnsPerRay(10);
+    engine.setFrameRate(100);
     engine.setLightBehavior(true, M_PI / 4);
     engine.setMainCamera(&camera);
     engine.setWindowResize(true);
     engine.setRenderFitMode(RenderFitMode::SQUARE);
     engine.getWalker()->setTargetScene(&scene);
-    engine.getWalker()->setMaxTileDistance(24);
+    engine.getWalker()->setMaxTileDistance(48);
     
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
@@ -66,12 +66,14 @@ int main() {
 
         // Dynamic field of view
         if(efDynamicFOV) {
+            float coef = (camera.getFieldOfView() / M_PI);
             if(engine.getKeyState(SDL_SCANCODE_UP) == KeyState::PRESS) {
-                camera.setFieldOfView(camera.getFieldOfView() - engine.getElapsedTime());
+                camera.setFieldOfView(camera.getFieldOfView() - engine.getElapsedTime() * 5 * coef);
             }
             if(engine.getKeyState(SDL_SCANCODE_DOWN) == KeyState::PRESS) {
-                camera.setFieldOfView(camera.getFieldOfView() + engine.getElapsedTime());
+                camera.setFieldOfView(camera.getFieldOfView() + engine.getElapsedTime() * 5 * coef);
             }
+            turnSpeed = 0.10f * M_PI * coef;
         }
 
         // Sun-cycle

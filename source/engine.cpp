@@ -11,6 +11,10 @@ namespace rp {
     using ::std::endl;
     #endif
 
+    void Engine::updateSurface() {
+        sdlSurface = SDL_GetWindowSurface(sdlWindow);
+        pixels = (uint32_t*)sdlSurface->pixels;
+    }
     RayHitInfo Engine::simulateBoundaryEnter(const Vector2& pos, const Vector2& dir) {
         // Form a simulated hit structure and fake the ray flag value
         RayHitInfo hit;
@@ -42,9 +46,10 @@ namespace rp {
         this->iScreenWidth = screenWidth;
         this->iScreenHeight = screenHeight;
         this->fAspectRatio = screenHeight / (float)screenWidth;
-        this->fLightAngle = 0.0f;
+        this->fSumFPS = 0.0f;
         this->fMaxTileDist = 16.0f;
         this->frameIndex = 0;
+        this->vLightDir = Vector2::RIGHT;
         this->tpLast = system_clock::now();
         this->keyStates = map<int, KeyState>();
         this->walker = new DDA();
@@ -52,15 +57,12 @@ namespace rp {
         setWindowResize(true);
 
         SDL_InitSubSystem(SDL_INIT_VIDEO);
-        SDL_CreateWindowAndRenderer(screenWidth, screenHeight, SDL_WINDOW_SHOWN, &this->sdlWindow, &this->sdlRenderer);
-        SDL_SetWindowTitle(this->sdlWindow, "Raycaster Plus Engine");
+        this->sdlWindow = SDL_CreateWindow("Raycaster Plus Engine", 0, 0, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
         SDL_SetWindowResizable(this->sdlWindow, SDL_TRUE);
-
-        SDL_SetRenderDrawBlendMode(sdlRenderer, SDL_BLENDMODE_BLEND); // For alpha channel
+        updateSurface();
     }
     Engine::~Engine() {
         SDL_DestroyWindow(sdlWindow);
-        SDL_DestroyRenderer(sdlRenderer);
         SDL_QuitSubSystem(SDL_INIT_VIDEO);
         SDL_Quit();
         if(walker != nullptr)
@@ -83,9 +85,9 @@ namespace rp {
     }
     void Engine::setLightBehavior(bool enabled, float angle) {
         bLightEnabled = enabled;
-        fLightAngle = angle;
+        vLightDir = (Vector2::RIGHT).rotate(angle);
     }
-    void Engine::setMainCamera(const Camera* camera) {
+    void Engine::setMainCamera(Camera* camera) {
         mainCamera = camera;
     }
     void Engine::setWindowResize(bool enabled) {
@@ -143,14 +145,18 @@ namespace rp {
     SDL_Window* Engine::getWindowHandle() {
         return sdlWindow;
     }
-    SDL_Renderer* Engine::getRendererHandle() {
-        return sdlRenderer;
-    }
     bool Engine::tick() {
-        // Compute time elapsed since the last method call
+
+        // Compute the time duration elapsed since the last method call
         time_point<system_clock> tpCurrent = system_clock::now();
         elapsedTime = tpCurrent - tpLast;
         tpLast = tpCurrent;
+
+        /************************************/
+        /************************************/
+        /********** GET INPUT DATA **********/
+        /************************************/
+        /************************************/
 
         // Complete the key states
         auto ksCopy = keyStates; // To avoid iteration through dynamicly-sized map
@@ -182,29 +188,37 @@ namespace rp {
                 case SDL_WINDOWEVENT:
                     if(event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
                         SDL_GetWindowSizeInPixels(sdlWindow, &iScreenWidth, &iScreenHeight);
-                        setRenderFitMode(renderFitMode); // Refresh fit mode to let it adapt to new resolution
+                        // Refresh the fit mode and the surface to let them adapt to a new resolution
+                        setRenderFitMode(renderFitMode);
+                        updateSurface();
                     }
                     break;
             }
         }
 
-        // Cache often-used information
+        /********************************************/
+        /********************************************/
+        /********** FILL THE SCREEN BUFFER **********/
+        /********************************************/
+        /********************************************/
+
+        // Perspective-correct minimum distance; if you stand this distance from the cube looking at it orthogonally,
+        // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
+        // located at height of 1/2.
+        const float pcmDist = 1 / (2 * tanf(mainCamera->getFieldOfView() / 2));
         const Scene* const mainScene = walker->getTargetScene();
         Vector2 camDir = mainCamera->getDirection();
         Vector2 camPos = mainCamera->getPosition();
         Vector2 planeVec = mainCamera->getPlane();
-        Vector2 lightDir;
-        const float refDist = 1 / (2 * tanf(mainCamera->getFieldOfView() / 2)); // Perspective-correct
-        if(bLightEnabled)
-            lightDir = (Vector2::RIGHT).rotate(fLightAngle);
 
-        // Obtain a line describing the camera plane
+        // Linear function describing the camera plane, it is later used for computing distances to intersection points
         const float planeSlope = planeVec.y / planeVec.x;
         LinearFunc planeLine(planeSlope, camPos.y - planeSlope * camPos.x, 0, 1);
 
-        // Clear the screen
-        SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
-        SDL_RenderClear(sdlRenderer);
+        // Clear the entire 
+        //SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 0);
+        //SDL_RenderClear(sdlRenderer);
+        SDL_FillRect(sdlSurface, NULL, 0x00000000);
 
         // Draw the current frame, which consists of pixel columns
         for(int column = 0; column < iColumnsCount; column += iColumnsPerRay) {
@@ -215,15 +229,6 @@ namespace rp {
             // Ray slope stays constant for all hits
             rayLine.slope = (rayDir.x == 0) ? (LinearFunc::MAX_SLOPE) : (rayDir.y / rayDir.x);
 
-            // Properties of the nearest wall, which will get drawn if found
-            // bool nwExists        = false;
-            // int nwTileData       = -1;
-            // float nwPlaneNormX     = -1; // Normalized horizontal position on the wall plane
-            // float nwDistance     = 1e30;
-            // Vector2 nwNormal     = Vector2::ZERO;
-            // Color nwColor    = {0, 0, 0, 0};
-            // int nwTexId = 0;
-
             // Perform step-based DDA algorithm to find out which tiles get hit by the ray, find
             // the nearest wall of the nearest tile.
             walker->init(camPos, rayDir);
@@ -231,9 +236,6 @@ namespace rp {
             bool originDone = false; // Whether walls from the origin were examined
             bool wasAnyHit = false;
             int renderHeight = getRenderHeight();
-            
-            Color pixelsBuffer[renderHeight];
-            memset(pixelsBuffer, 0, renderHeight);
 
             while(keepWalking) {
                 RayHitInfo hit = originDone ? walker->next() : simulateBoundaryEnter(camPos, rayDir);
@@ -261,12 +263,6 @@ namespace rp {
                 // Find the nearest wall in the obtained non-air tile
                 int tileData = mainScene->getTileData(hit.tile.x, hit.tile.y);
 
-                // #ifdef DEBUG
-                // if(column == iColumnsCount / 2) {
-                //     system("clear");
-                // }
-                // #endif
-
                 vector<WallDetails> details = mainScene->getTileWalls(tileData);
                 map<float, pair<int, Vector2>> dict; // Key: distance, Value: ( Key: index, Value: intersection )
 
@@ -288,24 +284,18 @@ namespace rp {
                 }
 
                 // Draw buffer
+                #ifdef DEBUG
+                // if(column == iColumnsCount / 2) {
+                //     system("clear");
+                // }
+                #endif
                 for(const auto& de : dict) {
 
                     const float planeDist = de.first;
                     const Vector2 inter = de.second.second;
                     const WallDetails wd = details.at(de.second.first);
 
-                    /***** SECTION: FIND WALL INTERSECTION AND NORMAL *****/
-
-                    // // // Find intersection point of line defining current wall geometry and the ray line
-                    // Vector2 inter = wd.func.getCommonPoint(rayLine);
-                    // if((inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) ||
-                    //    (inter.x < wd.func.xMin || inter.x > wd.func.xMax) ||
-                    //    (inter.y < wd.func.yMin || inter.y > wd.func.yMax)) {
-                    //     // Intersection point is out of tile or domain bounds, skip it then
-                    //     continue;
-                    // }
-                    // // Perpendicular distance from wall intersection point (global) to the camera plane
-                    // float planeDist = planeLine.getDistanceFromPoint(hit.tile + inter);
+                    // /***** SECTION: FIND WALL INTERSECTION AND NORMAL *****/
 
                     // Find normal vector that always points out of the wall plane
                     bool isNormalFlipped = false;
@@ -326,23 +316,9 @@ namespace rp {
 
                     
                     // Find out range describing column start and end height
-                    float lineHeight = renderHeight * (refDist / planeDist);
+                    float lineHeight = renderHeight * (pcmDist / planeDist);
                     float drawStart  = (renderHeight / 2 - lineHeight / 2);
                     float drawEnd    = (renderHeight / 2 + lineHeight / 2);
-
-                    // if(drawEnd < 0) {
-                    //     drawStart += drawEnd;
-                    //     drawEnd = 0;
-                    // }
-                    // #ifdef DEBUG
-                    // if(column == iColumnsCount / 2) {
-                    //     cout << drawStart << " to " << drawEnd << "\n";
-                    // }
-                    // #endif
-                    // lineHeight = clamp(lineHeight, 0, renderHeight);
-                    // drawStart  = clamp(drawStart,  0, renderHeight);
-                    // drawEnd    = clamp(drawEnd,    0, renderHeight);
-
 
                     const Texture* tex = mainScene->getTexture(wd.texId);
                     // Compute normalized horizontal position on the wall plane
@@ -352,34 +328,54 @@ namespace rp {
                     // Draw pixels to the buffer, with source being either texture or solid color
                     int limitedStart = drawStart + (1 - wd.hMax) * lineHeight;
                     int limitedEnd = drawEnd - wd.hMin * lineHeight;
-                    // CLAMP AFTERWARDS NOT JUST AFTER COMPUTING START AND HEIGHT BEFORE
+
+                    /*
+                        TODO: TEXTURES ARE HEAVY, REMAKE TEXTURE.HPP SO IT HOLDS UINTS INSTEAD OF COLOR STRUCTURES
+                        TODO: YOU ITERATE THROUGH EVERY PIXEL OF THE SCREEN STFU,,, INSTEAD JUMP MINIMAL TIMES TO
+                              GET NEXT TEXTURE PIXEL, USING PIXELHEIGHT VALUE, CHANGE THE FOR LOOP
+                    */
+
+                    float tempLS = limitedStart;
+                    float pixelHeight = (limitedEnd - limitedStart) / (float)tex->getHeight();
                     limitedStart = clamp(limitedStart, 0, renderHeight - 1);
                     limitedEnd = clamp(limitedEnd, 0, renderHeight - 1);
+                    
+                    #ifdef DEBUG
+                    // if(column == iColumnsCount / 2) {
+                    //     cout << pixelHeight << "\n";
+                    // }
+                    #endif
 
-                    for(int h = limitedStart; h != limitedEnd + 1; h++) {
-
-                        Color wc = (tex == nullptr) ? wd.tint : tex->getCoords(planeNormX, 1 - (h - limitedStart) / (float)lineHeight);
-
-                        // #ifdef DEBUG
-                        // if(column == iColumnsCount / 2) {
-                        //     cout << planeNormX, ((h - limitedStart) / lineHeight) << "\n";
-                        // }
-                        // #endif
+                    const int iRowsPerRead = 10;
+                    for(int h = limitedStart; h <= limitedEnd; h += iRowsPerRead) {
+                        Color wc = (tex == nullptr) ? wd.tint : tex->getCoords(planeNormX, 1 - (h - tempLS) / (float)lineHeight);
 
                         // Apply shading if light source is enabled
                         if(bLightEnabled) {
                             const float minBn = 0.3f;
-                            float perc = -1 * (normal.dot(lightDir) - 1) / 2; // Brightness linear interploation percent
+                            float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
                             float bn = minBn + (1 - minBn) * perc; // Final brightness
                             wc.red *= bn;
                             wc.green *= bn;
                             wc.blue *= bn;
                         }
 
-                        // IN THE FUTURE MIXING OPACITY COLOR WITH NEXT ONES CAN BE IMPLEMENTED
-                        if(pixelsBuffer[h].alpha == 0) {
-                            //wc.alpha -= pixelsBuffer[h].alpha;
-                            pixelsBuffer[h] = wc;
+                        uint8_t r, g, b;
+                        int index = (column + iHorOffset) + (h + iVerOffset) * sdlSurface->w;
+                        SDL_GetRGB(pixels[index], sdlSurface->format, &r, &g, &b);
+                        if(r + g + b == 0) {
+                            for(int i = 0; i < iColumnsPerRay; i++) {
+                                if(index + i % sdlSurface->w == 0) // Prevent from overriding lower segment
+                                    break;
+                                for(int j = 0; j < iRowsPerRead; j++) {
+                                    pixels[index + i + j * sdlSurface->w] = SDL_MapRGB(
+                                        sdlSurface->format,
+                                        wc.red   == 0 ? 1 : wc.red,
+                                        wc.green == 0 ? 1 : wc.green,
+                                        wc.blue  == 0 ? 1 : wc.blue
+                                    );
+                                }
+                            }
                         }
                     }
 
@@ -395,92 +391,36 @@ namespace rp {
             if(!wasAnyHit)
                 continue; // Ray ended his walk and hit nothing, skip the iteration
 
-            const int iRowsPerColor = 1;
-            Color lc;
-            for(int h = 0; h <= renderHeight; h += iRowsPerColor) {
-                Color wc = pixelsBuffer[h];
-                if(wc.alpha == 0)
-                    continue;
-                
-                if(wc.red != lc.red || wc.green != lc.green || wc.blue != lc.blue || wc.alpha != lc.alpha) {
-                    lc = wc;
-                    SDL_SetRenderDrawColor(sdlRenderer, lc.red, lc.green, lc.blue, lc.alpha);
-                }
-
-
-                for(int i = 0; i < iColumnsPerRay; i++)
-                    for(int j = 0; j < iRowsPerColor; j++)
-                    SDL_RenderDrawPoint(
-                        sdlRenderer,
-                        iHorOffset + column + i,
-                        h + j
-                        // h,
-                        // iHorOffset + column + iColumnsPerRay,
-                        // h
-                    );
-            }
-        
-            // // Use texture if existent, otherwise just a solid color
-            // const Texture* tex = mainScene->getTexture(nwTexId);
-            // if(tex == nullptr) {
-            //     SDL_SetRenderDrawColor(sdlRenderer, nwColor.red, nwColor.green, nwColor.blue, SDL_ALPHA_OPAQUE);
-            //     for(int i = 0; i < iColumnsPerRay; i++)
-            //         SDL_RenderDrawLine(
-            //             sdlRenderer,
-            //             iHorOffset + column + i,
-            //             iVerOffset + drawStart,
-            //             iHorOffset + column + i,
-            //             iVerOffset + drawEnd
-            //         );
-            // } else {
-            //     // Draw part of the texture from top to bottom using normalized plane position information
-                // int texHeight = tex->getHeight();
-                // float pixelHeight = lineHeight / (float)texHeight;
-
-                // // if(column == iColumnsCount / 2) {
-                // //     system("clear");
-                // //     std::cout << nwPlaneNormX << "\n";
-                // // }
-
-                // for(int y = 0; y < texHeight; y++) {
-                //     Color px = tex->getCoords(nwPlaneNormX, y / (float)texHeight);
-                //     SDL_SetRenderDrawColor(sdlRenderer, px.red, px.green, px.blue, 255);
-                //     for(int i = 0; i < iColumnsPerRay; i++)
-                //         SDL_RenderDrawLine(
-                //             sdlRenderer,
-                //             iHorOffset + column + i,
-                //             iVerOffset + drawStart - pixelHeight * y,
-                //             iHorOffset + column + i,
-                //             iVerOffset + drawStart - pixelHeight * (y + 1)
-                //         );
-                // }
-            // }
-
             #ifdef DEBUG
             if(abs(column - iColumnsCount / 2) <= iColumnsPerRay) {
-                SDL_SetRenderDrawColor(sdlRenderer, 255, 255, 255, 255);
-                SDL_RenderDrawLine(
-                    sdlRenderer,
-                    iScreenWidth / 2,
-                    iVerOffset,
-                    iScreenWidth / 2,
-                    iScreenHeight - iVerOffset
-                );
+                for(int i = 0; i < renderHeight; i++)
+                    pixels[iScreenWidth / 2 + i * sdlSurface->w] = 0xffffff;
             }
             #endif
         }
 
+        if(bIsCursorLocked)
+            SDL_WarpMouseInWindow(sdlWindow, iScreenWidth / 2, iScreenHeight / 2);
+        
         #ifdef DEBUG
         if(frameIndex % msFrameDuration == 0) {
             system("clear");
-            cout << "Frames per second: " << (1.0f / getElapsedTime()) << "\n";
+
+            int framesRendered = frameIndex / msFrameDuration;
+            float fps = 1.0f / getElapsedTime();
+            fSumFPS += fps;
+            cout << "Current FPS: " << (1.0f / getElapsedTime()) << "\n";
+            // cout << "Average FPS: " << (fSumFPS / framesRendered) << "\n";
         }
         #endif
 
-        if(bIsCursorLocked)
-            SDL_WarpMouseInWindow(sdlWindow, iScreenWidth / 2, iScreenHeight / 2);
+        /***********************************************/
+        /***********************************************/
+        /********** DISPLAY THE SCREEN BUFFER **********/
+        /***********************************************/
+        /***********************************************/
 
-        SDL_RenderPresent(sdlRenderer);
+        SDL_UpdateWindowSurface(sdlWindow);
         SDL_Delay(msFrameDuration);
         frameIndex++;
         return bRun;

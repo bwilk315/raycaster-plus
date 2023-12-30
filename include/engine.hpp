@@ -46,19 +46,22 @@ namespace rp {
             int iScreenHeight;
             int iVerOffset;
             float fAspectRatio;
-            float fLightAngle;
+            float fSumFPS;
             float fMaxTileDist;
             uint64_t frameIndex;
-            RenderFitMode renderFitMode;
+            Vector2  vLightDir;
+            RenderFitMode            renderFitMode;
             time_point<system_clock> tpLast;
-            duration<float> elapsedTime;
-            map<int, KeyState> keyStates;
+            duration<float>          elapsedTime;
+            map<int, KeyState>       keyStates;
 
-            const Camera* mainCamera = nullptr;
-            DDA* walker = nullptr;
-            SDL_Window* sdlWindow = nullptr;
-            SDL_Renderer* sdlRenderer = nullptr;
+            uint32_t*     pixels      = nullptr;  // Array of window surface pixels
+            Camera*       mainCamera  = nullptr;
+            DDA*          walker      = nullptr;
+            SDL_Surface*  sdlSurface  = nullptr;
+            SDL_Window*   sdlWindow   = nullptr;
 
+            void updateSurface();
             RayHitInfo simulateBoundaryEnter(const Vector2& pos, const Vector2& dir);
         public:
             enum {
@@ -74,7 +77,7 @@ namespace rp {
             void setColumnsPerRay(int columns);
             void setFrameRate(int framesPerSecond);
             void setLightBehavior(bool enabled, float angle);
-            void setMainCamera(const Camera* camera);
+            void setMainCamera(Camera* camera);
             void setWindowResize(bool enabled);
             int setRenderFitMode(const RenderFitMode& rfm);
             int getScreenWidth() const;
@@ -85,7 +88,6 @@ namespace rp {
             KeyState getKeyState(int scanCode) const;
             DDA* const getWalker();
             SDL_Window* getWindowHandle();
-            SDL_Renderer* getRendererHandle();
             bool tick();
     };
 }
