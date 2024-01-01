@@ -21,11 +21,11 @@ int main() {
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(1);
-    engine.setFrameRate(30);
+    engine.setColumnsPerRay(4);
+    engine.setFrameRate(60);
     engine.setLightBehavior(true, M_PI / 4);
     engine.setMainCamera(&camera);
-    engine.setRowsInterval(1);
+    engine.setRowsInterval(4);
     engine.setWindowResize(true);
     engine.setRenderFitMode(RenderFitMode::SQUARE);
     engine.getWalker()->setTargetScene(&scene);

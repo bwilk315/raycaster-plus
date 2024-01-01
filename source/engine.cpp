@@ -82,7 +82,7 @@ namespace rp {
         iColumnsPerRay = clamp(columns, 1, getRenderWidth());
     }
     void Engine::setFrameRate(int framesPerSecond) {
-        msFrameDuration = 1000 / clamp(framesPerSecond, 1, 1000);
+        iFramesPerSecond = clamp(framesPerSecond, 1, 512);
     }
     void Engine::setLightBehavior(bool enabled, float angle) {
         bLightEnabled = enabled;
@@ -406,22 +406,23 @@ namespace rp {
         if(bIsCursorLocked)
             SDL_WarpMouseInWindow(sdlWindow, iScreenWidth / 2, iScreenHeight / 2);
         
-        #ifdef DEBUG
-        if(frameIndex % msFrameDuration == 0) {
-            system("clear");
-            float fps = 1.0f / getElapsedTime();
-            cout << "Current FPS: " << (1.0f / getElapsedTime()) << "\n";
-        }
-        #endif
-
         /***********************************************/
         /***********************************************/
         /********** DISPLAY THE SCREEN BUFFER **********/
         /***********************************************/
         /***********************************************/
 
+        int delay = (1.0f / iFramesPerSecond - elapsedTime.count()) * 1000;
+
+        #ifdef DEBUG
+        if(frameIndex % iFramesPerSecond == 0) {
+            system("clear");
+            cout << "Delay [ms]: " << delay << "\n";
+        }
+        #endif
+
+        SDL_Delay(delay < 0 ? 0 : delay);
         SDL_UpdateWindowSurface(sdlWindow);
-        SDL_Delay(msFrameDuration);
         frameIndex++;
         return bRun;
     }

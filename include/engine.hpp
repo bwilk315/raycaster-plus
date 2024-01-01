@@ -40,7 +40,7 @@ namespace rp {
             bool bRun;
             int iColumnsPerRay;
             int iColumnsCount;
-            int msFrameDuration;
+            int iFramesPerSecond;
             int iRowsInterval;
             int iHorOffset;
             int iScreenWidth;
