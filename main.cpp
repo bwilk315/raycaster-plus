@@ -11,33 +11,21 @@ int main() {
     if(error.second != Scene::E_CLEAR)
         return 1;
 
-    // #ifdef DEBUG
-    // for(const WallDetails& wd : scene.getTileWalls(2)) {
-    //     std::cout << wd.tint << std::endl;
-
-    //     uint8_t r, g, b, a;
-    //     Texture::getNumberAsColor(wd.tint, r, g, b, a);
-
-    //     std::cout << (int)r << ", " << (int)g << ", " << (int)b << ", " << (int)a << std::endl;
-    // }
-
-    // return 0;
-    // #endif
-
     const float invSqrt2 = 1 / sqrt(2);
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
     float turnSpeed = M_PI * 0.66f;
     Camera camera(Vector2(11.5f, 19.5f), M_PI/2, fovAngle);
-    Engine engine(720, 720);
+    Engine engine(1000, 1000);
     bool lockCursor = false;
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(4);
-    engine.setFrameRate(60);
+    engine.setColumnsPerRay(1);
+    engine.setFrameRate(30);
     engine.setLightBehavior(true, M_PI / 4);
     engine.setMainCamera(&camera);
+    engine.setRowsInterval(1);
     engine.setWindowResize(true);
     engine.setRenderFitMode(RenderFitMode::SQUARE);
     engine.getWalker()->setTargetScene(&scene);
@@ -52,7 +40,6 @@ int main() {
     int fitMode = 0;
     float lightAngle = 0;
     while(engine.tick()) {
-        //camera.setDirection(0);
 
         /********** EXPERIMENTAL FEATURES **********/
 
@@ -71,14 +58,12 @@ int main() {
 
         // Dynamic field of view
         if(efDynamicFOV) {
-            float coef = (camera.getFieldOfView() / M_PI);
             if(engine.getKeyState(SDL_SCANCODE_UP) == KeyState::PRESS) {
-                camera.setFieldOfView(camera.getFieldOfView() - engine.getElapsedTime() * 5 * coef);
+                camera.setFieldOfView(camera.getFieldOfView() - engine.getElapsedTime());
             }
             if(engine.getKeyState(SDL_SCANCODE_DOWN) == KeyState::PRESS) {
-                camera.setFieldOfView(camera.getFieldOfView() + engine.getElapsedTime() * 5 * coef);
+                camera.setFieldOfView(camera.getFieldOfView() + engine.getElapsedTime());
             }
-            turnSpeed = 0.10f * M_PI * coef;
         }
 
         // Sun-cycle

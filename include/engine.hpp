@@ -41,6 +41,7 @@ namespace rp {
             int iColumnsPerRay;
             int iColumnsCount;
             int msFrameDuration;
+            int iRowsInterval;
             int iHorOffset;
             int iScreenWidth;
             int iScreenHeight;
@@ -78,6 +79,7 @@ namespace rp {
             void setFrameRate(int framesPerSecond);
             void setLightBehavior(bool enabled, float angle);
             void setMainCamera(Camera* camera);
+            void setRowsInterval(int interval);
             void setWindowResize(bool enabled);
             int setRenderFitMode(const RenderFitMode& rfm);
             int getScreenWidth() const;

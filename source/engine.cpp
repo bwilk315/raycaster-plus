@@ -79,7 +79,7 @@ namespace rp {
         SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE);
     }
     void Engine::setColumnsPerRay(int columns) {
-        iColumnsPerRay = clamp(columns, 1, iScreenWidth);
+        iColumnsPerRay = clamp(columns, 1, getRenderWidth());
     }
     void Engine::setFrameRate(int framesPerSecond) {
         msFrameDuration = 1000 / clamp(framesPerSecond, 1, 1000);
@@ -90,6 +90,9 @@ namespace rp {
     }
     void Engine::setMainCamera(Camera* camera) {
         mainCamera = camera;
+    }
+    void Engine::setRowsInterval(int interval) {
+        iRowsInterval = clamp(interval, 1, getRenderHeight());
     }
     void Engine::setWindowResize(bool enabled) {
         bAllowWindowResize = enabled;
@@ -203,6 +206,8 @@ namespace rp {
         /********************************************/
         /********************************************/
 
+        int renderWidth = getRenderWidth();
+        int renderHeight = getRenderHeight();
         // Perspective-correct minimum distance; if you stand this distance from the cube looking at it orthogonally,
         // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
         // located at height of 1/2.
@@ -216,16 +221,14 @@ namespace rp {
         const float planeSlope = planeVec.y / planeVec.x;
         LinearFunc planeLine(planeSlope, camPos.y - planeSlope * camPos.x, 0, 1);
 
-        // Clear the entire 
-        //SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 0);
-        //SDL_RenderClear(sdlRenderer);
-
+        // Clear the entire screen buffer
         SDL_LockSurface(sdlSurface);
         SDL_memset(pixels, 0, sdlSurface->pitch * sdlSurface->h);
         SDL_UnlockSurface(sdlSurface);
 
         // Draw the current frame, which consists of pixel columns
-        for(int column = 0; column < iColumnsCount; column += iColumnsPerRay) {
+        for(int column = 0; column < renderWidth; column += iColumnsPerRay) {
+
             // Position of the ray on the camera plane, from -1 (left) to 1 (right)
             float cameraX = 2 * column / (float)iColumnsCount - 1;
             Vector2 rayDir = (camDir + planeVec * cameraX).normalized();
@@ -239,8 +242,6 @@ namespace rp {
             bool keepWalking = true;
             bool originDone = false; // Whether walls from the origin were examined
             bool wasAnyHit = false;
-            int renderWidth = getRenderWidth();
-            int renderHeight = getRenderHeight();
 
             while(keepWalking) {
                 RayHitInfo hit = originDone ? walker->next() : simulateBoundaryEnter(camPos, rayDir);
@@ -268,10 +269,10 @@ namespace rp {
                 // Find the nearest wall in the obtained non-air tile
                 int tileData = mainScene->getTileData(hit.tile.x, hit.tile.y);
 
+                // Compute additional information of the walls, store them in a map that will sort them by distance
                 vector<WallDetails> details = mainScene->getTileWalls(tileData);
-                map<float, pair<int, Vector2>> dict; // Key: distance, Value: ( Key: index, Value: intersection )
+                map<float, pair<int, Vector2>> additional; // Key: distance, Value: ( Key: index, Value: intersection )
 
-                /* THIS LOOP IS INTENTED TO SORT THE WALLS BY DISTANCE (KEY OF THE MAP, which does it automaticaly) */
                 for(int i = 0; i < details.size(); i++) {
                     WallDetails* wdp = &details.at(i);
                     // Find intersection point of line defining current wall geometry and the ray line
@@ -285,22 +286,15 @@ namespace rp {
                     // Perpendicular distance from wall intersection point (global) to the camera plane
                     float planeDist = planeLine.getDistanceFromPoint(hit.tile + inter);
 
-                    dict.insert(pair<float, pair<int, Vector2>>(planeDist, pair<int, Vector2>(i, inter)));
+                    additional.insert(pair<float, pair<int, Vector2>>(planeDist, pair<int, Vector2>(i, inter)));
                 }
-
+                
                 // Draw buffer
-                #ifdef DEBUG
-                // if(column == iColumnsCount / 2) {
-                //     system("clear");
-                // }
-                #endif
-                for(const auto& de : dict) {
+                for(const auto& extra : additional) {
 
-                    const float planeDist = de.first;
-                    const Vector2 inter = de.second.second;
-                    const WallDetails wd = details.at(de.second.first);
-
-                    // /***** SECTION: FIND WALL INTERSECTION AND NORMAL *****/
+                    const float planeDist = extra.first;
+                    const Vector2 inter = extra.second.second;
+                    const WallDetails wd = details.at(extra.second.first);
 
                     // Find normal vector that always points out of the wall plane
                     bool isNormalFlipped = false;
@@ -316,9 +310,6 @@ namespace rp {
                     // origin tile, there are always two but only one is in front of the camera (detected using dot product).
                     if(!originDone && rayDir.dot(normal) > 0)
                         continue;
-
-                    /***** SECTION: UPDATE PIXELS BUFFER *****/
-
                     
                     // Find out range describing how column should be drawn for the current wall
                     int lineHeight = renderHeight * (pcmDist / planeDist);
@@ -328,7 +319,7 @@ namespace rp {
                     int limStart   = drawStart + (1 - wd.hMax) * lineHeight;
                     int limEnd     = drawEnd - wd.hMin * lineHeight;
                     int limHeight  = drawEnd - drawStart;
-                    // This will change
+                    // Index of the screen buffer at which drawing will start, in upper direction
                     int currIndex = (iVerOffset + limEnd) * sdlSurface->w + iHorOffset + column;
 
                     const Texture* tex = mainScene->getTexture(wd.texId);
@@ -340,20 +331,15 @@ namespace rp {
 
 
                     SDL_LockSurface(sdlSurface);
-                    // limEnd is used as height position teller!
-                    int leClip = 0;
+                    int leClip = 0; // Height below which line is invisible
                     if(limEnd >= renderHeight) {
                         leClip = limEnd - renderHeight;
                         currIndex -= leClip * sdlSurface->w;
                         limEnd -= leClip;
                     }
-                    
-
-                    // This loop runs renderHeight at max
-
-                    //  PROBLEM: BLACK PIXELS ARE SOMEHOW OMITTED DURING THE DRAWING
-                    const int iRowsInterval = 4;
                     for(int h = leClip; h < limHeight; h += iRowsInterval) {
+                        //  PROBLEM: BLACK PIXELS ARE SOMEHOW OMITTED DURING THE DRAWING
+
                         if(limEnd < 0) {
                             break;
                         } else if(limEnd < renderHeight) {
@@ -377,29 +363,23 @@ namespace rp {
                                 uint8_t cr, cg, cb, ca; // Current color
                                 Texture::getNumberAsColor(pixels[currIndex], cr, cg, cb, ca);
 
-                                // #ifdef DEBUG
-                                // if(h == leClip && column == iColumnsCount / 2) {
-                                //     cout << (int)cr << " " << (int)cg << " " << (int)cb << " " << (int)ca << "\n";
-                                // }
-                                // #endif
-
-                                if(ca == 0) {
+                                // Set screen buffer pixel if it is not already (meaning its opacity is 0)
+                                if(ca == 0)
                                     for(int i = 0; i < iColumnsPerRay; i++) {
-                                        if((column + i) % renderWidth == 0)
-                                            continue;
+                                        if(column + i == renderWidth)
+                                            break;
                                         for(int j = 0; j < iRowsInterval; j++) {
                                             if(limEnd - j < 0)
-                                                continue;
+                                                break;
                                             // Use SDL-provided function for converting RGBA color in appropriate way to a single number
                                             pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, wr, wg, wb);
                                         }
                                     }
-                                }
                             }
                         }
 
-                        currIndex -= iRowsInterval * sdlSurface->w;
-                        limEnd -= iRowsInterval;
+                        currIndex -= iRowsInterval * sdlSurface->w; // Move the buffer index up
+                        limEnd -= iRowsInterval; // Move the height coordinate up
                     }
                     SDL_UnlockSurface(sdlSurface);
 
@@ -408,7 +388,6 @@ namespace rp {
                         keepWalking = false;
                         break;
                     }
-                    
                 }
                 
                 originDone = true;
@@ -430,12 +409,8 @@ namespace rp {
         #ifdef DEBUG
         if(frameIndex % msFrameDuration == 0) {
             system("clear");
-
-            int framesRendered = frameIndex / msFrameDuration;
             float fps = 1.0f / getElapsedTime();
-            fSumFPS += fps;
             cout << "Current FPS: " << (1.0f / getElapsedTime()) << "\n";
-            // cout << "Average FPS: " << (fSumFPS / framesRendered) << "\n";
         }
         #endif
 
