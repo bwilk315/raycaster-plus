@@ -11,41 +11,25 @@
 
 namespace rp {
     using ::std::string;
-    using ::std::ostream;
-
-    struct Color {
-        static const Color CLEAR;
-        static const Color BLACK;
-        static const Color WHITE;
-        static const Color RED;
-        static const Color GREEN;
-        static const Color BLUE;
-
-        uint8_t red;
-        uint8_t green;
-        uint8_t blue;
-        uint8_t alpha;
-
-        Color();
-        Color(uint8_t red, uint8_t green, uint8_t blue);
-        Color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
-    };
     #ifdef DEBUG
-    ostream& operator<<(ostream& stream, const Color& color);
+    using ::std::ostream;
     #endif
 
     class Texture {
         private:
             int width;
             int height;
-            png_bytep bytes;
+            uint32_t* pixels; // RGBAs compressed to single numbers
         public:
-            static const uint8_t CHANNELS;
             enum {
                 E_CLEAR,
                 E_CANNOT_OPEN_FILE,
                 E_FAILED_READING_FILE
             };
+
+            // Do not use generated number to set surface pixels, use appropriate provided by SDL instead
+            static uint32_t getColorAsNumber(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a);
+            static void getNumberAsColor(uint32_t n, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a);
 
             Texture();
             Texture(const string& file);
@@ -53,8 +37,8 @@ namespace rp {
             int getWidth() const;
             int getHeight() const;
             int loadFromFile(const string& file);
-            Color getPosition(int x, int y) const;
-            Color getCoords(float u, float v) const;
+            uint32_t getPosition(int x, int y) const;
+            uint32_t getCoords(float u, float v) const;
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Texture& tex);

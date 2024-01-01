@@ -1,6 +1,6 @@
 
-#ifndef _ENGINE_HPP
-#define _ENGINE_HPP
+#ifndef _RP_ENGINE_HPP
+#define _RP_ENGINE_HPP
 
 #ifdef DEBUG
 #include <iostream>

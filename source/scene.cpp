@@ -11,7 +11,7 @@ namespace rp {
 
     WallDetails::WallDetails() {
         this->func = LinearFunc();
-        this->tint = Color::WHITE;
+        this->tint = 0;
         this->bp0 = Vector2::ZERO;
         this->bp1 = Vector2::ZERO;
         this->hMin = 0;
@@ -19,7 +19,7 @@ namespace rp {
         this->texId = WallDetails::NO_TEXTURE;
         this->stopsRay = true;
     }
-    WallDetails::WallDetails(const LinearFunc& func, const Color& tint, float hMin, float hMax, uint16_t texId, bool stopsRay) {
+    WallDetails::WallDetails(const LinearFunc& func, const uint32_t& tint, float hMin, float hMax, uint16_t texId, bool stopsRay) {
         this->func = func;
         this->tint = tint;
         this->hMin = hMin; 
@@ -250,7 +250,7 @@ namespace rp {
                                 stof(args.at(8)),
                                 stof(args.at(9))
                             ),
-                            Color(
+                            Texture::getColorAsNumber(
                                 (uint8_t)stof(args.at(15)),
                                 (uint8_t)stof(args.at(16)),
                                 (uint8_t)stof(args.at(17)),

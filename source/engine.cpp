@@ -14,6 +14,7 @@ namespace rp {
     void Engine::updateSurface() {
         sdlSurface = SDL_GetWindowSurface(sdlWindow);
         pixels = (uint32_t*)sdlSurface->pixels;
+        SDL_SetSurfaceBlendMode(sdlSurface, SDL_BLENDMODE_BLEND);
     }
     RayHitInfo Engine::simulateBoundaryEnter(const Vector2& pos, const Vector2& dir) {
         // Form a simulated hit structure and fake the ray flag value
@@ -218,7 +219,10 @@ namespace rp {
         // Clear the entire 
         //SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 0);
         //SDL_RenderClear(sdlRenderer);
-        SDL_FillRect(sdlSurface, NULL, 0x00000000);
+
+        SDL_LockSurface(sdlSurface);
+        SDL_memset(pixels, 0, sdlSurface->pitch * sdlSurface->h);
+        SDL_UnlockSurface(sdlSurface);
 
         // Draw the current frame, which consists of pixel columns
         for(int column = 0; column < iColumnsCount; column += iColumnsPerRay) {
@@ -235,6 +239,7 @@ namespace rp {
             bool keepWalking = true;
             bool originDone = false; // Whether walls from the origin were examined
             bool wasAnyHit = false;
+            int renderWidth = getRenderWidth();
             int renderHeight = getRenderHeight();
 
             while(keepWalking) {
@@ -315,75 +320,95 @@ namespace rp {
                     /***** SECTION: UPDATE PIXELS BUFFER *****/
 
                     
-                    // Find out range describing column start and end height
-                    float lineHeight = renderHeight * (pcmDist / planeDist);
-                    float drawStart  = (renderHeight / 2 - lineHeight / 2);
-                    float drawEnd    = (renderHeight / 2 + lineHeight / 2);
+                    // Find out range describing how column should be drawn for the current wall
+                    int lineHeight = renderHeight * (pcmDist / planeDist);
+                    int drawStart  = (renderHeight / 2 - lineHeight / 2);
+                    int drawEnd    = (renderHeight / 2 + lineHeight / 2);
+                    // Compute starting and ending height according to the wall height range
+                    int limStart   = drawStart + (1 - wd.hMax) * lineHeight;
+                    int limEnd     = drawEnd - wd.hMin * lineHeight;
+                    int limHeight  = drawEnd - drawStart;
+                    // This will change
+                    int currIndex = (iVerOffset + limEnd) * sdlSurface->w + iHorOffset + column;
 
                     const Texture* tex = mainScene->getTexture(wd.texId);
+                    int texHeight = tex == nullptr ? 1 : tex->getHeight();
                     // Compute normalized horizontal position on the wall plane
                     float planeNormX = ((isNormalFlipped ? wd.bp1 : wd.bp0) - inter).magnitude() / (wd.bp1 - wd.bp0).magnitude();
-                    //float texHeight = (float)tex->getHeight();
+                    // Get height of a single pixel on the computed line (if texture is not found, it spans the whole height)
+                    float pixelHeight = lineHeight / (float)texHeight;
 
-                    // Draw pixels to the buffer, with source being either texture or solid color
-                    int limitedStart = drawStart + (1 - wd.hMax) * lineHeight;
-                    int limitedEnd = drawEnd - wd.hMin * lineHeight;
 
-                    /*
-                        TODO: TEXTURES ARE HEAVY, REMAKE TEXTURE.HPP SO IT HOLDS UINTS INSTEAD OF COLOR STRUCTURES
-                        TODO: YOU ITERATE THROUGH EVERY PIXEL OF THE SCREEN STFU,,, INSTEAD JUMP MINIMAL TIMES TO
-                              GET NEXT TEXTURE PIXEL, USING PIXELHEIGHT VALUE, CHANGE THE FOR LOOP
-                    */
-
-                    float tempLS = limitedStart;
-                    float pixelHeight = (limitedEnd - limitedStart) / (float)tex->getHeight();
-                    limitedStart = clamp(limitedStart, 0, renderHeight - 1);
-                    limitedEnd = clamp(limitedEnd, 0, renderHeight - 1);
+                    SDL_LockSurface(sdlSurface);
+                    // limEnd is used as height position teller!
+                    int leClip = 0;
+                    if(limEnd >= renderHeight) {
+                        leClip = limEnd - renderHeight;
+                        currIndex -= leClip * sdlSurface->w;
+                        limEnd -= leClip;
+                    }
                     
-                    #ifdef DEBUG
-                    // if(column == iColumnsCount / 2) {
-                    //     cout << pixelHeight << "\n";
-                    // }
-                    #endif
 
-                    const int iRowsPerRead = 10;
-                    for(int h = limitedStart; h <= limitedEnd; h += iRowsPerRead) {
-                        Color wc = (tex == nullptr) ? wd.tint : tex->getCoords(planeNormX, 1 - (h - tempLS) / (float)lineHeight);
+                    // This loop runs renderHeight at max
 
-                        // Apply shading if light source is enabled
-                        if(bLightEnabled) {
-                            const float minBn = 0.3f;
-                            float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
-                            float bn = minBn + (1 - minBn) * perc; // Final brightness
-                            wc.red *= bn;
-                            wc.green *= bn;
-                            wc.blue *= bn;
-                        }
+                    //  PROBLEM: BLACK PIXELS ARE SOMEHOW OMITTED DURING THE DRAWING
+                    const int iRowsInterval = 4;
+                    for(int h = leClip; h < limHeight; h += iRowsInterval) {
+                        if(limEnd < 0) {
+                            break;
+                        } else if(limEnd < renderHeight) {
+                            uint8_t wr, wg, wb, wa; // Wall color
+                            Texture::getNumberAsColor(
+                                (tex == nullptr) ? wd.tint : tex->getCoords(planeNormX, h / (float)limHeight),
+                                wr, wg, wb, wa
+                            );
 
-                        uint8_t r, g, b;
-                        int index = (column + iHorOffset) + (h + iVerOffset) * sdlSurface->w;
-                        SDL_GetRGB(pixels[index], sdlSurface->format, &r, &g, &b);
-                        if(r + g + b == 0) {
-                            for(int i = 0; i < iColumnsPerRay; i++) {
-                                if(index + i % sdlSurface->w == 0) // Prevent from overriding lower segment
-                                    break;
-                                for(int j = 0; j < iRowsPerRead; j++) {
-                                    pixels[index + i + j * sdlSurface->w] = SDL_MapRGB(
-                                        sdlSurface->format,
-                                        wc.red   == 0 ? 1 : wc.red,
-                                        wc.green == 0 ? 1 : wc.green,
-                                        wc.blue  == 0 ? 1 : wc.blue
-                                    );
+                            if(wa != 0) {
+                                // Apply shading if light source is enabled
+                                if(bLightEnabled) {
+                                    const float minBn = 0.3f;
+                                    float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
+                                    float bn = minBn + (1 - minBn) * perc; // Final brightness
+                                    wr *= bn;
+                                    wg *= bn;
+                                    wb *= bn;
+                                }
+
+                                uint8_t cr, cg, cb, ca; // Current color
+                                Texture::getNumberAsColor(pixels[currIndex], cr, cg, cb, ca);
+
+                                // #ifdef DEBUG
+                                // if(h == leClip && column == iColumnsCount / 2) {
+                                //     cout << (int)cr << " " << (int)cg << " " << (int)cb << " " << (int)ca << "\n";
+                                // }
+                                // #endif
+
+                                if(ca == 0) {
+                                    for(int i = 0; i < iColumnsPerRay; i++) {
+                                        if((column + i) % renderWidth == 0)
+                                            continue;
+                                        for(int j = 0; j < iRowsInterval; j++) {
+                                            if(limEnd - j < 0)
+                                                continue;
+                                            // Use SDL-provided function for converting RGBA color in appropriate way to a single number
+                                            pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, wr, wg, wb);
+                                        }
+                                    }
                                 }
                             }
                         }
+
+                        currIndex -= iRowsInterval * sdlSurface->w;
+                        limEnd -= iRowsInterval;
                     }
+                    SDL_UnlockSurface(sdlSurface);
 
                     wasAnyHit = true;
                     if(wd.stopsRay) {
                         keepWalking = false;
                         break;
                     }
+                    
                 }
                 
                 originDone = true;

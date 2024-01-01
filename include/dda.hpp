@@ -1,6 +1,6 @@
 
-#ifndef _DDA_HPP
-#define _DDA_HPP
+#ifndef _RP_DDA_HPP
+#define _RP_DDA_HPP
 
 #ifdef DEBUG
 #include <iostream>

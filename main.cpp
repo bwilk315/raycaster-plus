@@ -12,8 +12,13 @@ int main() {
         return 1;
 
     // #ifdef DEBUG
-    // for(const auto& wd : scene.getTileWalls(7)) {
-    //     std::cout << wd << std::endl;
+    // for(const WallDetails& wd : scene.getTileWalls(2)) {
+    //     std::cout << wd.tint << std::endl;
+
+    //     uint8_t r, g, b, a;
+    //     Texture::getNumberAsColor(wd.tint, r, g, b, a);
+
+    //     std::cout << (int)r << ", " << (int)g << ", " << (int)b << ", " << (int)a << std::endl;
     // }
 
     // return 0;
@@ -23,20 +28,20 @@ int main() {
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
     float turnSpeed = M_PI * 0.66f;
-    Camera camera(Vector2(11.5f, 36.5f), -M_PI/2, fovAngle);
+    Camera camera(Vector2(11.5f, 19.5f), M_PI/2, fovAngle);
     Engine engine(720, 720);
     bool lockCursor = false;
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(10);
-    engine.setFrameRate(100);
+    engine.setColumnsPerRay(4);
+    engine.setFrameRate(60);
     engine.setLightBehavior(true, M_PI / 4);
     engine.setMainCamera(&camera);
     engine.setWindowResize(true);
     engine.setRenderFitMode(RenderFitMode::SQUARE);
     engine.getWalker()->setTargetScene(&scene);
-    engine.getWalker()->setMaxTileDistance(48);
+    engine.getWalker()->setMaxTileDistance(21);
     
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
@@ -106,7 +111,7 @@ int main() {
                 0,
                 WallDetails(
                     LinearFunc(slope, intercept, x1 < x2 ? x1 : x2, x1 > x2 ? x1 : x2),
-                    { 255, 128, 64},
+                    Texture::getColorAsNumber(255, 128, 64, 255),
                     0,
                     1,
                     0,

@@ -30,14 +30,14 @@ namespace rp {
         static const uint16_t NO_TEXTURE;
 
         LinearFunc func;  // Function describing top-down look of the wall
-        Color tint;       // Tint color of the wall surface
         Vector2 bp0, bp1; // Intersection points of tile boundary and the function
         float hMin, hMax; // Range of wall height to draw
+        uint32_t tint;    // Tint color of the wall surface
         uint16_t texId;   // ID number of texture to use (0 indicates no texture)
         bool stopsRay;    // Flag telling if ray should stop after hitting the wall
 
         WallDetails();
-        WallDetails(const LinearFunc& func, const Color& tint, float hMin, float hMax, uint16_t texId, bool stopsRay);
+        WallDetails(const LinearFunc& func, const uint32_t& tint, float hMin, float hMax, uint16_t texId, bool stopsRay);
         
         void updateBoundaryPoints();
     };
