@@ -7,6 +7,7 @@
 #endif
 #include <string>
 #include <png.h>
+#include "globals.hpp"
 
 namespace rp {
     #ifdef DEBUG
@@ -15,9 +16,6 @@ namespace rp {
     using ::std::endl;
     #endif
     using ::std::string;
-
-    void decodeRGBA(uint32_t n, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a);
-    uint32_t encodeRGBA(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a);
 
     /**
      * Lets you load a PNG image file and work with its pixel data in RGBA color space.

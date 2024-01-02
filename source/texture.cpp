@@ -4,23 +4,6 @@
 namespace rp {
 
     /************************************/
-    /********** GLOBAL MEMBERS **********/
-    /************************************/
-
-    void decodeRGBA(uint32_t n, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a) {
-        r = (n % 0x100000000 - n % 0x001000000) / 0x001000000;
-        g = (n % 0x001000000 - n % 0x000010000) / 0x000010000;
-        b = (n % 0x000010000 - n % 0x000000100) / 0x000000100;
-        a = n % 0x000000100;
-    }
-    uint32_t encodeRGBA(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a) {
-        return 0x01000000 * (16 * (r / 16) + r % 16) +
-               0x00010000 * (16 * (g / 16) + g % 16) +
-               0x00000100 * (16 * (b / 16) + b % 16) +
-               0x00000001 * (16 * (a / 16) + a % 16);
-    }
-
-    /************************************/
     /********** CLASS: TEXTURE **********/
     /************************************/
 
@@ -64,11 +47,18 @@ namespace rp {
                 // Store RGBA pixels as single numbers
                 this->pixels = new uint32_t[size / 4];
                 for(int i = 0; i < size; i += 4) {
+                    // As in the scene loading, increase each of RGB channels to prevent it from being
+                    // near pitch black color, which is used for pixel-detection by the engine.
+                    uint8_t r, g, b, a;
+                    r = bytes[i + 0];
+                    g = bytes[i + 1];
+                    b = bytes[i + 2];
+                    a = bytes[i + 3];
                     this->pixels[i / 4] = encodeRGBA(
-                        bytes[i + 0],
-                        bytes[i + 1],
-                        bytes[i + 2],
-                        bytes[i + 3]
+                        clamp(r, MIN_CHANNEL, 255),
+                        clamp(g, MIN_CHANNEL, 255),
+                        clamp(b, MIN_CHANNEL, 255),
+                        a
                     );
                 }
             } else {

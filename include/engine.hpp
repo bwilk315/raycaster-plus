@@ -10,6 +10,7 @@
 #include <SDL2/SDL.h>
 #include "camera.hpp"
 #include "dda.hpp"
+#include "globals.hpp"
 #include "math.hpp"
 #include "scene.hpp"
 #include "texture.hpp"
@@ -36,6 +37,9 @@ namespace rp {
         SQUARE   // Render is the biggest square possible to fit with the current resolution
     };
 
+    /**
+     * It is too early for describing this class, it is dynamically changing right now
+     */
     class Engine {
         private:
             bool bAllowWindowResize;
@@ -59,7 +63,7 @@ namespace rp {
             RenderFitMode            renderFitMode;
             time_point<system_clock> tpLast;
             duration<float>          elapsedTime;
-            map<int, KeyState>       keyStates;
+            map<int, KeyState>       keyStates; // SDL Scancode -> State of that key
 
             uint32_t*     pixels      = nullptr;  // Array of window surface pixels
             Camera*       mainCamera  = nullptr;
@@ -67,7 +71,9 @@ namespace rp {
             SDL_Surface*  sdlSurface  = nullptr;
             SDL_Window*   sdlWindow   = nullptr;
 
+            // This method is called when screen size changes, because pixels array must match the actual size
             void updateSurface();
+            // It is used once per ray to render walls of the tile in which it starts stepping
             RayHitInfo simulateBoundaryEnter(const Vector2& pos, const Vector2& dir);
         public:
             static const float MAX_LINE_SLOPE;

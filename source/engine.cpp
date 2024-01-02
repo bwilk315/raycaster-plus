@@ -336,13 +336,12 @@ namespace rp {
                     // Index of the screen buffer at which drawing will start, in upper direction
                     int currIndex = (iVerOffset + limEnd) * sdlSurface->w + iHorOffset + column;
 
-                    const Texture* tex = mainScene->getTexture(wd.texId);
+                    const Texture* tex = mainScene->getTextureSource(wd.texId);
                     int texHeight = tex == nullptr ? 1 : tex->getHeight();
                     // Compute normalized horizontal position on the wall plane
                     float planeNormX = ((isNormalFlipped ? wd.bp1 : wd.bp0) - inter).magnitude() / (wd.bp1 - wd.bp0).magnitude();
                     // Get height of a single pixel on the computed line (if texture is not found, it spans the whole height)
                     float pixelHeight = lineHeight / (float)texHeight;
-
 
                     SDL_LockSurface(sdlSurface);
                     int leClip = 0; // Height below which line is invisible
@@ -364,12 +363,12 @@ namespace rp {
                             );
 
                             if(wa != 0) {
-
                                 uint8_t cr, cg, cb, ca; // Current color
                                 decodeRGBA(pixels[currIndex], cr, cg, cb, ca);
 
-                                // Set screen buffer pixel if it is not already (meaning its opacity is 0)
-                                if(ca == 0) {
+                                // Set screen buffer pixel if it is not already (meaning it is pure black),
+                                // This trick is only possible because texture loader is made to alter black to not be so pure.
+                                if(cr + cg + cb < MIN_CHANNEL) {
 
                                     // Apply shading if light source is enabled
                                     if(bLightEnabled) {
@@ -388,7 +387,12 @@ namespace rp {
                                             if(limEnd - j < 0)
                                                 break;
                                             // Use SDL-provided function for converting RGBA color in appropriate way to a single number
-                                            pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGBA(sdlSurface->format, wr, wg, wb, wa);
+                                            pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGB(
+                                                sdlSurface->format,
+                                                clamp(wr, MIN_CHANNEL, 255),
+                                                clamp(wg, MIN_CHANNEL, 255),
+                                                clamp(wb, MIN_CHANNEL, 255)
+                                            );
                                         }
                                     }
                                 }
@@ -434,8 +438,8 @@ namespace rp {
 
         #ifdef DEBUG
         if(frameIndex % iFramesPerSecond == 0) {
-            //system("clear");
-            //cout << "Delay [ms]: " << delay << "\n";
+            system("clear");
+            cout << "Delay [ms]: " << delay << "\n";
         }
         #endif
         

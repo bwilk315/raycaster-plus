@@ -5,6 +5,7 @@
 #ifdef DEBUG
 #include <iostream>
 #endif
+#include "globals.hpp"
 #include "math.hpp"
 
 namespace rp {

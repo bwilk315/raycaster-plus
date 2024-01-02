@@ -6,8 +6,6 @@
 #include <iostream>
 #endif
 #include <cmath>
-#include <sstream>
-#include <string>
 #include <vector>
 
 namespace rp {
@@ -16,18 +14,11 @@ namespace rp {
     using ::std::cout;
     using ::std::endl;
     #endif
-    using ::std::istringstream;
-    using ::std::string;
     using ::std::abs;
-    using ::std::noskipws;
     using ::std::sqrt;
 
     class LinearFunc;
     class Vector2;
-
-    bool isFloat(const string& text);
-    int clamp(int value, int min, int max);
-    float clamp(float value, float min, float max);
 
     struct LinearFunc {
         float slope;      // Rate of change

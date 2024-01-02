@@ -10,6 +10,7 @@ int main() {
     std::cout << scene.getError() << " at " << line << std::endl;
     if(scene.getError())
         return 1;
+    scene.loadTexture("resources/steve.png");
 
     const float invSqrt2 = 1 / sqrt(2);
     const float moveSpeed = 2;
@@ -21,8 +22,8 @@ int main() {
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(1);
-    engine.setFrameRate(40);
+    engine.setColumnsPerRay(4);
+    engine.setFrameRate(60);
     engine.setLightBehavior(true, 0);
     engine.setMainCamera(&camera);
     engine.setRowsInterval(4);
@@ -33,46 +34,9 @@ int main() {
     
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
-    bool efDynamicRFM = true;
-    bool efDynamicFOV = false;
-    bool efSunCycle = false;
-    bool efBillboard = false;
-    int fitMode = 0;
-    float lightAngle = 0;
+    bool efBillboard = true;
     while(engine.tick()) {
 
-        /********** EXPERIMENTAL FEATURES **********/
-
-        // Dynamic render fit mode
-        if(efDynamicRFM) {
-            if(engine.getKeyState(SDL_SCANCODE_0) == KeyState::DOWN) {
-                fitMode = (++fitMode == 2) ? (0) : (fitMode);
-                engine.setRenderFitMode((RenderFitMode)fitMode);
-
-                system("clear");
-                std::cout << engine.getScreenWidth() << "x" << engine.getScreenHeight() << "\n";
-                std::cout << engine.getRenderWidth() << "x" << engine.getRenderHeight() << "\n";
-                std::cout << fitMode << "\n";
-            }
-        }
-
-        // Dynamic field of view
-        if(efDynamicFOV) {
-            if(engine.getKeyState(SDL_SCANCODE_UP) == KeyState::PRESS) {
-                camera.setFieldOfView(camera.getFieldOfView() - engine.getElapsedTime());
-            }
-            if(engine.getKeyState(SDL_SCANCODE_DOWN) == KeyState::PRESS) {
-                camera.setFieldOfView(camera.getFieldOfView() + engine.getElapsedTime());
-            }
-        }
-
-        // Sun-cycle
-        if(efSunCycle) {
-            engine.setLightBehavior(true, lightAngle);
-            lightAngle += engine.getElapsedTime() / 10;
-        }
-
-        // Billboard
         if(efBillboard) {
             // Plane is always looking at the player, appears flat
             Vector2 ort = camera.getDirection().orthogonal();
@@ -89,18 +53,21 @@ int main() {
             float delta = b * b - 4.0f * a * c;
             float x1 = (-1 * b - sqrtf(delta)) / (2.0f * a);
             float x2 = (-1 * b + sqrtf(delta)) / (2.0f * a);
-            x1 = 0; // for amogus
-            x2 = 1;
             scene.setTileWall(
-                5,
+                10,
                 0,
                 WallData(
-                    LinearFunc(slope, intercept, x1 < x2 ? x1 : x2, x1 > x2 ? x1 : x2),
+                    LinearFunc(
+                        slope,
+                        intercept,
+                        x1 < x2 ? x1 : x2,
+                        x1 > x2 ? x1 : x2
+                    ),
                     encodeRGBA(255, 128, 64, 255),
                     0,
                     1,
-                    0,
-                    1
+                    scene.getTextureId("resources/steve.png"),
+                    0
                 )
             );
         }
@@ -108,10 +75,10 @@ int main() {
         /********* BASIC PLAYER MECHANICS **********/
 
         // Game management
-        if(engine.getKeyState(SDL_SCANCODE_ESCAPE) == KeyState::DOWN) {
+        if(engine.getKeyState(SDL_SCANCODE_ESCAPE) == KeyState::UP) {
             engine.stop();
         }
-        if(engine.getKeyState(SDL_SCANCODE_C) == KeyState::DOWN) {
+        if(engine.getKeyState(SDL_SCANCODE_C) == KeyState::UP) {
             lockCursor = !lockCursor;
             engine.setCursorLock(lockCursor);
             engine.setCursorVisibility(!lockCursor);
@@ -133,14 +100,16 @@ int main() {
             engine.requestRedraw();
         }
 
-        // Camera rotation
+        // Camera rotation 
         if(lockCursor) {
-            // Mouse based
+            // Mouse based (for now kinda bugged)
             int currMouseX;
             SDL_GetMouseState(&currMouseX, NULL);
             int mouseDeltaX = currMouseX - engine.getScreenWidth() / 2;
-            if(mouseDeltaX != 0)
+            if(mouseDeltaX != 0) {
                 camera.changeDirection(-1 * turnSpeed * mouseDeltaX * engine.getElapsedTime());
+                engine.requestRedraw();
+            }
         } else {
             // Keyboard based
             if(engine.getKeyState(SDL_SCANCODE_RIGHT) == KeyState::PRESS) {

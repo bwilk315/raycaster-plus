@@ -120,12 +120,23 @@ namespace rp {
     int Scene::getHeight() const {
         return height;
     }
-    const Texture* Scene::getTexture(int texId) const {
+    int Scene::getTextureId(const string& rpsFile) const {
+        if(texIds.count(rpsFile) == 0)
+            return 0;
+        return texIds.at(rpsFile);
+    }
+    string Scene::getTextureName(int texId) const {
+        for(const auto& p : texIds)
+            if(p.second == texId)
+                return p.first;
+        return "";
+    }
+    const Texture* Scene::getTextureSource(int texId) const {
         if(texSources.count(texId) == 0)
             return nullptr;
         return &texSources.at(texId);
     }
-    const Texture* Scene::getTexture(const string& rpsFile) const {
+    const Texture* Scene::getTextureSource(const string& rpsFile) const {
         if(texIds.count(rpsFile) == 0)
             return nullptr;
         return &texSources.at(texIds.at(rpsFile));
@@ -269,9 +280,11 @@ namespace rp {
                                 stof(args.at(9))
                             ),
                             encodeRGBA(
-                                (uint8_t)stof(args.at(15)),
-                                (uint8_t)stof(args.at(16)),
-                                (uint8_t)stof(args.at(17)),
+                                // Add 1 to prevent the color from being pure black, because engine uses this color
+                                // in pixel-occupation status purposes.
+                                (uint8_t)clamp((int)stof(args.at(15)), MIN_CHANNEL, 255),
+                                (uint8_t)clamp((int)stof(args.at(16)), MIN_CHANNEL, 255),
+                                (uint8_t)clamp((int)stof(args.at(17)), MIN_CHANNEL, 255),
                                 (uint8_t)stof(args.at(18))
                             ),
                             stof(args.at(10)),
