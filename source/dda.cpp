@@ -5,9 +5,9 @@
 
 namespace rp {
 
-    /************************************************/
-    /********** STRUCTURE: RAY HIT INFORMATION ******/
-    /************************************************/
+    /*********************************************/
+    /********** STRUCTURE: RAY HIT INFO **********/
+    /*********************************************/
 
     RayHitInfo::RayHitInfo() {
         this->distance = -1;
@@ -26,19 +26,20 @@ namespace rp {
     }
     #endif
 
-    /******************************************************/
-    /********** CLASS: DIGITAL DIFFERENTIAL ANALYSIS ******/
-    /******************************************************/
+    /**********************************************************/
+    /********** CLASS: DIGITAL DIFFERENTIAL ANALYSIS **********/
+    /**********************************************************/
 
     DDA::DDA() {
         this->initialized = false;
     }
-    DDA::DDA(Scene* scene, int maxTileDist) {
-        this->initialized = false;
+    DDA::DDA(const Scene* scene) : DDA() {
         setTargetScene(scene);
+    }
+    DDA::DDA(const Scene* scene, int maxTileDist) : DDA(scene) {
         setMaxTileDistance(maxTileDist);
     }
-    void DDA::setTargetScene(Scene* scene) {
+    void DDA::setTargetScene(const Scene* scene) {
         this->scene = scene;
     }
     void DDA::setMaxTileDistance(float distance) {
@@ -47,7 +48,7 @@ namespace rp {
     float DDA::getMaxTileDistance() const {
         return maxTileDist;
     }
-    const Scene* const DDA::getTargetScene() const {
+    const Scene* DDA::getTargetScene() const {
         return scene;
     }
     void DDA::init(const Vector2& start, const Vector2& direction) {
@@ -79,7 +80,7 @@ namespace rp {
     }
     RayHitInfo DDA::next() {
         if(!initialized) {
-            rayFlag = DDA::RF_ERROR;
+            rayFlag = DDA::RF_FAIL;
             return RayHitInfo();
         }
         

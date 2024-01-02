@@ -5,7 +5,6 @@
 #ifdef DEBUG
 #include <iostream>
 #endif
-
 #include <string>
 #include <png.h>
 

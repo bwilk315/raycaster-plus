@@ -13,6 +13,15 @@ namespace rp {
     #endif
     using ::std::abs;
 
+    /**
+     * Provides theoretical camera functionality (practical part is done by engine).
+     * 
+     * Camera is built by composing three vectors: `position`, `direction` and `plane`. `position` vector
+     * tells the camera position, `direction` obviously its looking direction, and `plane` the one
+     * clockwisely-perpendicular to the `direction` vector.
+     * `plane` vector (and its magnitude) is especially important: it simulates a screen space in form of
+     * a line (as if you were looking at your monitor from the top).
+     */
     class Camera {
         private:
             float fieldOfView;
