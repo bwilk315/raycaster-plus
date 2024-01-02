@@ -15,6 +15,10 @@
 #include "texture.hpp"
 
 namespace rp {
+    #ifdef DEBUG
+    using ::std::cout;
+    using ::std::endl;
+    #endif
     using ::std::chrono::time_point;
     using ::std::chrono::system_clock;
     using ::std::chrono::duration;
@@ -37,6 +41,7 @@ namespace rp {
             bool bAllowWindowResize;
             bool bIsCursorLocked;
             bool bLightEnabled;
+            bool bRedraw;
             bool bRun;
             int iColumnsPerRay;
             int iColumnsCount;
@@ -65,6 +70,8 @@ namespace rp {
             void updateSurface();
             RayHitInfo simulateBoundaryEnter(const Vector2& pos, const Vector2& dir);
         public:
+            static const float MAX_LINE_SLOPE;
+
             enum {
                 E_CLEAR,
                 E_MAIN_CAMERA_NOT_SET
@@ -81,6 +88,7 @@ namespace rp {
             void setMainCamera(Camera* camera);
             void setRowsInterval(int interval);
             void setWindowResize(bool enabled);
+            void requestRedraw();
             int setRenderFitMode(const RenderFitMode& rfm);
             int getScreenWidth() const;
             int getScreenHeight() const;

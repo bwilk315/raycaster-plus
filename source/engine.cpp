@@ -1,15 +1,13 @@
 
 #include "../include/engine.hpp"
 
-#ifdef DEBUG
-#include <iostream>
-#endif
+namespace rp {    
 
-namespace rp {
-    #ifdef DEBUG
-    using ::std::cout;
-    using ::std::endl;
-    #endif
+    /***********************************/
+    /********** CLASS: ENGINE **********/
+    /***********************************/
+
+    const float Engine::MAX_LINE_SLOPE = 1e4f;
 
     void Engine::updateSurface() {
         sdlSurface = SDL_GetWindowSurface(sdlWindow);
@@ -43,6 +41,7 @@ namespace rp {
         this->bIsCursorLocked = false;
         this->bLightEnabled = false;
         this->bRun = true;
+        this->bRedraw = false;
         this->iColumnsPerRay = 4;
         this->iScreenWidth = screenWidth;
         this->iScreenHeight = screenHeight;
@@ -97,6 +96,9 @@ namespace rp {
     void Engine::setWindowResize(bool enabled) {
         bAllowWindowResize = enabled;
         SDL_SetWindowResizable(sdlWindow, (SDL_bool)enabled);
+    }
+    void Engine::requestRedraw() {
+        bRedraw = true;
     }
     int Engine::setRenderFitMode(const RenderFitMode& rfm) {
         if(mainCamera == nullptr)
@@ -221,10 +223,16 @@ namespace rp {
         const float planeSlope = planeVec.y / planeVec.x;
         LinearFunc planeLine(planeSlope, camPos.y - planeSlope * camPos.x, 0, 1);
 
-        // Clear the entire screen buffer
-        SDL_LockSurface(sdlSurface);
-        SDL_memset(pixels, 0, sdlSurface->pitch * sdlSurface->h);
-        SDL_UnlockSurface(sdlSurface);
+        if(bRedraw) {
+            // Clear the entire screen buffer
+            SDL_LockSurface(sdlSurface);
+            SDL_memset(pixels, 0, sdlSurface->pitch * sdlSurface->h);
+            SDL_UnlockSurface(sdlSurface);
+        } else {
+            // Skip drawing process if redrawing is not requested
+            renderWidth = 0;
+            elapsedTime = duration<float>(1.0f / iFramesPerSecond);
+        }
 
         // Draw the current frame, which consists of pixel columns
         for(int column = 0; column < renderWidth; column += iColumnsPerRay) {
@@ -234,7 +242,7 @@ namespace rp {
             Vector2 rayDir = (camDir + planeVec * cameraX).normalized();
             LinearFunc rayLine;  // Line equation describing the ray walk
             // Ray slope stays constant for all hits
-            rayLine.slope = (rayDir.x == 0) ? (LinearFunc::MAX_SLOPE) : (rayDir.y / rayDir.x);
+            rayLine.slope = (rayDir.x == 0) ? (MAX_LINE_SLOPE) : (rayDir.y / rayDir.x);
 
             // Perform step-based DDA algorithm to find out which tiles get hit by the ray, find
             // the nearest wall of the nearest tile.
@@ -267,14 +275,15 @@ namespace rp {
                 rayLine.height = rayIntY - rayLine.slope * rayIntX;
 
                 // Find the nearest wall in the obtained non-air tile
-                int tileData = mainScene->getTileData(hit.tile.x, hit.tile.y);
+                int tileData = mainScene->getTileId(hit.tile.x, hit.tile.y);
 
                 // Compute additional information of the walls, store them in a map that will sort them by distance
-                vector<WallDetails> details = mainScene->getTileWalls(tileData);
+                vector<WallData> details = mainScene->getTileWalls(tileData);
                 map<float, pair<int, Vector2>> additional; // Key: distance, Value: ( Key: index, Value: intersection )
 
+                int reps = 0; // Wall line repetitions
                 for(int i = 0; i < details.size(); i++) {
-                    WallDetails* wdp = &details.at(i);
+                    WallData* wdp = &details.at(i);
                     // Find intersection point of line defining current wall geometry and the ray line
                     Vector2 inter = wdp->func.getCommonPoint(rayLine);
                     if((inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) ||
@@ -285,6 +294,11 @@ namespace rp {
                     }
                     // Perpendicular distance from wall intersection point (global) to the camera plane
                     float planeDist = planeLine.getDistanceFromPoint(hit.tile + inter);
+                    planeDist = (int)(planeDist * 10000) / 10000.0f; // simple rounding
+
+                    // Plane distance must be unique, because it is a key of map
+                    if(additional.count(planeDist) != 0)
+                        planeDist += 1e-5f * ++reps;
 
                     additional.insert(pair<float, pair<int, Vector2>>(planeDist, pair<int, Vector2>(i, inter)));
                 }
@@ -294,7 +308,7 @@ namespace rp {
 
                     const float planeDist = extra.first;
                     const Vector2 inter = extra.second.second;
-                    const WallDetails wd = details.at(extra.second.first);
+                    const WallData wd = details.at(extra.second.first);
 
                     // Find normal vector that always points out of the wall plane
                     bool isNormalFlipped = false;
@@ -344,27 +358,29 @@ namespace rp {
                             break;
                         } else if(limEnd < renderHeight) {
                             uint8_t wr, wg, wb, wa; // Wall color
-                            Texture::getNumberAsColor(
+                            decodeRGBA(
                                 (tex == nullptr) ? wd.tint : tex->getCoords(planeNormX, h / (float)limHeight),
                                 wr, wg, wb, wa
                             );
 
                             if(wa != 0) {
-                                // Apply shading if light source is enabled
-                                if(bLightEnabled) {
-                                    const float minBn = 0.3f;
-                                    float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
-                                    float bn = minBn + (1 - minBn) * perc; // Final brightness
-                                    wr *= bn;
-                                    wg *= bn;
-                                    wb *= bn;
-                                }
 
                                 uint8_t cr, cg, cb, ca; // Current color
-                                Texture::getNumberAsColor(pixels[currIndex], cr, cg, cb, ca);
+                                decodeRGBA(pixels[currIndex], cr, cg, cb, ca);
 
                                 // Set screen buffer pixel if it is not already (meaning its opacity is 0)
-                                if(ca == 0)
+                                if(ca == 0) {
+
+                                    // Apply shading if light source is enabled
+                                    if(bLightEnabled) {
+                                        const float minBn = 0.2f;
+                                        float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
+                                        float bn = minBn + (1 - minBn) * perc; // Final brightness
+                                        wr *= bn;
+                                        wg *= bn;
+                                        wb *= bn;
+                                    }
+
                                     for(int i = 0; i < iColumnsPerRay; i++) {
                                         if(column + i == renderWidth)
                                             break;
@@ -372,9 +388,10 @@ namespace rp {
                                             if(limEnd - j < 0)
                                                 break;
                                             // Use SDL-provided function for converting RGBA color in appropriate way to a single number
-                                            pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, wr, wg, wb);
+                                            pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGBA(sdlSurface->format, wr, wg, wb, wa);
                                         }
                                     }
+                                }
                             }
                         }
 
@@ -413,16 +430,21 @@ namespace rp {
         /***********************************************/
 
         int delay = (1.0f / iFramesPerSecond - elapsedTime.count()) * 1000;
+        delay = delay < 0 ? 0 : delay;
 
         #ifdef DEBUG
         if(frameIndex % iFramesPerSecond == 0) {
-            system("clear");
-            cout << "Delay [ms]: " << delay << "\n";
+            //system("clear");
+            //cout << "Delay [ms]: " << delay << "\n";
         }
         #endif
+        
+        SDL_Delay(delay); // Maybe this causes the lag when unfreezing?
 
-        SDL_Delay(delay < 0 ? 0 : delay);
-        SDL_UpdateWindowSurface(sdlWindow);
+        if(bRedraw) {
+            SDL_UpdateWindowSurface(sdlWindow);
+            bRedraw = false;
+        }
         frameIndex++;
         return bRun;
     }

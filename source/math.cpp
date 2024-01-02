@@ -2,36 +2,27 @@
 #include "../include/math.hpp"
 
 namespace rp {
-    const float EI_TOL = 0.00001f;
+
+    /************************************/
+    /********** GLOBAL MEMBERS **********/
+    /************************************/
 
     bool isFloat(const string& str) {
-        std::istringstream iss(str);
+        istringstream iss(str);
         float _;
-        iss >> std::noskipws >> _;
+        iss >> noskipws >> _;
         return iss.eof() && !iss.fail();
     }
-    int digitCount(int n) {
-        int posNum = std::abs(n);
-        int digits = 1;
-        int power = 1;
-        while(true) {
-            power *= 10;
-            if(power > posNum)
-                break;
-            digits++;
-        }
-        if(n < 0) digits++; // Include the minus sign
-        return ((n < 0) ? (1) : (0)) + digits;
+    int clamp(int value, int min, int max) {
+        return value < min ? min : (value > max ? max : value);
     }
     float clamp(float value, float min, float max) {
-        return (value < min) ? (min) : ((value > max) ? (max) : (value));
+        return value < min ? min : (value > max ? max : value);
     }
 
-    /********************************************/
-    /********** STRUCTURE: LINEAR FUNCTION ******/
-    /********************************************/
-
-    const float LinearFunc::MAX_SLOPE = 1e4;
+    /************************************************/
+    /********** STRUCTURE: LINEAR FUNCTION **********/
+    /************************************************/
 
     LinearFunc::LinearFunc() {
         this->slope = 0;
@@ -71,9 +62,9 @@ namespace rp {
     }
     #endif
 
-    /*************************************************/
-    /********** STRUCTURE: 2-DIMENSIONAL VECTOR ******/
-    /*************************************************/
+    /*****************************************************/
+    /********** STRUCTURE: 2-DIMENSIONAL VECTOR **********/
+    /*****************************************************/
 
     const Vector2 Vector2::ZERO = Vector2(0, 0);
     const Vector2 Vector2::UP = Vector2(0, 1);
@@ -97,7 +88,7 @@ namespace rp {
     }
     Vector2 Vector2::normalized() const {
         float mag = magnitude();
-        return mag == 0 ? Vector2::ZERO : Vector2(x / mag, y / mag);
+        return mag == 0 ? ZERO : Vector2(x / mag, y / mag);
     }
     Vector2 Vector2::orthogonal() const {
         return Vector2(y, -1 * x);
@@ -106,6 +97,12 @@ namespace rp {
         float sin = sinf(radians);
         float cos = cosf(radians);
         return Vector2(cos * x - sin * y, sin * x + cos * y);
+    }
+    bool Vector2::operator==(const Vector2& other) const {
+        return this->x == other.x && this->y == other.y;
+    }
+    bool Vector2::operator!=(const Vector2& other) const {
+        return this->x != other.x || this->y != other.y;
     }
     Vector2 Vector2::operator+(const Vector2& other) const {
         return Vector2(this->x + other.x, this->y + other.y);

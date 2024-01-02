@@ -107,7 +107,7 @@ namespace rp {
         }
 
         // If tile data is not zero, then ray hit this tile
-        int tileData = scene->getTileData(planePosX, planePosY);
+        int tileData = scene->getTileId(planePosX, planePosY);
         if(tileData != 0) {
             float distance = (rayFlag == DDA::RF_SIDE) ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
             rayFlag |= DDA::RF_HIT;

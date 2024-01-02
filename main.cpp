@@ -6,24 +6,24 @@ using namespace rp;
 
 int main() {
     Scene scene;
-    int_pair error = scene.loadFromFile("resources/example.plane");
-    std::cout << error.first << ", " << error.second << std::endl;
-    if(error.second != Scene::E_CLEAR)
+    int line = scene.loadFromFile("resources/my_world.rps");
+    std::cout << scene.getError() << " at " << line << std::endl;
+    if(scene.getError())
         return 1;
 
     const float invSqrt2 = 1 / sqrt(2);
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
     float turnSpeed = M_PI * 0.66f;
-    Camera camera(Vector2(11.5f, 19.5f), M_PI/2, fovAngle);
+    Camera camera(Vector2(1.5f, 1.5f), M_PI/2, fovAngle);
     Engine engine(1000, 1000);
     bool lockCursor = false;
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(4);
-    engine.setFrameRate(60);
-    engine.setLightBehavior(true, M_PI / 4);
+    engine.setColumnsPerRay(1);
+    engine.setFrameRate(40);
+    engine.setLightBehavior(true, 0);
     engine.setMainCamera(&camera);
     engine.setRowsInterval(4);
     engine.setWindowResize(true);
@@ -34,7 +34,7 @@ int main() {
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
     bool efDynamicRFM = true;
-    bool efDynamicFOV = true;
+    bool efDynamicFOV = false;
     bool efSunCycle = false;
     bool efBillboard = false;
     int fitMode = 0;
@@ -94,9 +94,9 @@ int main() {
             scene.setTileWall(
                 5,
                 0,
-                WallDetails(
+                WallData(
                     LinearFunc(slope, intercept, x1 < x2 ? x1 : x2, x1 > x2 ? x1 : x2),
-                    Texture::getColorAsNumber(255, 128, 64, 255),
+                    encodeRGBA(255, 128, 64, 255),
                     0,
                     1,
                     0,
@@ -123,13 +123,14 @@ int main() {
         if(engine.getKeyState(SDL_SCANCODE_S) == KeyState::PRESS) moveInput.y += -1;
         if(engine.getKeyState(SDL_SCANCODE_D) == KeyState::PRESS) moveInput.x += 1;
         if(engine.getKeyState(SDL_SCANCODE_A) == KeyState::PRESS) moveInput.x += -1;
-        float mag = (moveInput.x != 0 && moveInput.y != 0) ? invSqrt2 : 1;
+        float mag = (moveInput.x != 0 && moveInput.y != 0) ? invSqrt2 : moveInput.magnitude();
         if(mag != 0) {
             Vector2 camDir = camera.getDirection();
             Vector2 posChange = camDir.orthogonal() * moveInput.x + camDir * moveInput.y;
             camera.changePosition(
                 posChange * moveSpeed * engine.getElapsedTime() * mag
             );
+            engine.requestRedraw();
         }
 
         // Camera rotation
@@ -144,11 +145,14 @@ int main() {
             // Keyboard based
             if(engine.getKeyState(SDL_SCANCODE_RIGHT) == KeyState::PRESS) {
                 camera.changeDirection(-1 * turnSpeed * engine.getElapsedTime());
+                engine.requestRedraw();
             }
             if(engine.getKeyState(SDL_SCANCODE_LEFT) == KeyState::PRESS) {
                 camera.changeDirection(turnSpeed * engine.getElapsedTime());
+                engine.requestRedraw();
             }
         }
+
     }
 
     return 0;

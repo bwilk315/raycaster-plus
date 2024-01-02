@@ -10,33 +10,45 @@
 #include <png.h>
 
 namespace rp {
-    using ::std::string;
     #ifdef DEBUG
     using ::std::ostream;
+    using ::std::cout;
+    using ::std::endl;
     #endif
+    using ::std::string;
 
+    void decodeRGBA(uint32_t n, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a);
+    uint32_t encodeRGBA(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a);
+
+    /**
+     * Lets you load a PNG image file and work with its pixel data in RGBA color space.
+     * It is a good practice to check for errors after every interaction with the class
+     * object, use `getError` method to get the latest error code.
+     * 
+     * Stored pixels are encoded to single number using `encodeRGBA` function, if you want
+     * to access individual channels data you have to decode a number using `decodeRGBA` function.
+     */
     class Texture {
         private:
+            mutable int error;
             int width;
             int height;
-            uint32_t* pixels; // RGBAs compressed to single numbers
+            uint32_t* pixels;
         public:
             enum {
                 E_CLEAR,
                 E_CANNOT_OPEN_FILE,
-                E_FAILED_READING_FILE
+                E_FAILED_READING_FILE,
+                E_INVALID_POSITION
             };
 
-            // Do not use generated number to set surface pixels, use appropriate provided by SDL instead
-            static uint32_t getColorAsNumber(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a);
-            static void getNumberAsColor(uint32_t n, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a);
-
             Texture();
-            Texture(const string& file);
+            Texture(const string& pngFile);
             ~Texture();
             int getWidth() const;
             int getHeight() const;
-            int loadFromFile(const string& file);
+            int getError() const;
+            void loadFromFile(const string& pngFile);
             uint32_t getPosition(int x, int y) const;
             uint32_t getCoords(float u, float v) const;
     };

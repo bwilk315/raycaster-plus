@@ -1,0 +1,47 @@
+
+# Notice: order of commands hardly ever matters (and if it does it's logical)
+
+# Define world size
+# <width> <height>
+
+s 11 11
+
+# Define world tile data
+# <x0> <x1> ...         <x5>
+
+w 0 1 5 1 1 1 1 1 5 1 0
+w 4 0 0 6 0 0 0 7 0 0 2
+w 4 0 0 6 1 5 1 7 0 0 2
+w 4 0 0 0 0 8 0 0 0 0 2
+w 4 0 0 0 0 0 0 0 0 0 2
+w 4 0 0 0 0 0 0 0 0 0 2
+w 4 0 0 0 0 0 0 0 0 0 2
+w 4 0 0 0 0 0 0 0 0 0 2
+w 4 0 0 0 0 0 0 0 0 0 2
+w 4 0 0 0 0 0 0 0 0 0 2
+w 0 3 3 3 3 3 3 3 3 3 0
+
+# Define wall properties for tiles
+# t <tileData>  l <lineSlope>  <lineHeight> d <xMin> <xMax> <yMin> <yMax> <hMin> <hMax> r <stopsRay> c <r> <g> <b> <a> x <textureFile>
+
+# 2x Cobblestone walls
+t 1 l 0 0 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 1 l 0 0 d 0 1 0 1 1 2 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 2 l 10000 0 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 2 l 10000 0 d 0 1 0 1 1 2 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 3 l 0 1 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 3 l 0 1 d 0 1 0 1 1 2 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 4 l 10000 -9999 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 4 l 10000 -9999 d 0 1 0 1 1 2 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+
+# Flagged double cobblestone wall
+t 5 l 0 0 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 5 l 0 0 d 0 1 0 1 1 2 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 5 l 0 0 d 0 1 0 1 2 3 r 0 c 255 255 255 255 x "resources/flag.png"
+
+# Floating 2nd cobblestone walls
+t 6 l 10000 -9999 d 0 1 0 1 1 2 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+t 7 l 10000 0 d 0 1 0 1 1 2 r 0 c 255 255 255 255 x "resources/cobblestone.png"
+
+# Paintings
+t 8 l 0 0.75 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/demon.png"

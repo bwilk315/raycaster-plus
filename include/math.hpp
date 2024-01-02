@@ -5,33 +5,35 @@
 #ifdef DEBUG
 #include <iostream>
 #endif
-#include <vector>
-#include <string>
-#include <sstream>
 #include <cmath>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace rp {
     #ifdef DEBUG
     using ::std::ostream;
+    using ::std::cout;
+    using ::std::endl;
     #endif
+    using ::std::istringstream;
     using ::std::string;
-    using ::std::sqrt;
     using ::std::abs;
+    using ::std::noskipws;
+    using ::std::sqrt;
 
     class LinearFunc;
     class Vector2;
 
-    bool isFloat(const string& str);
-    int digitCount(int n);
+    bool isFloat(const string& text);
+    int clamp(int value, int min, int max);
     float clamp(float value, float min, float max);
 
     struct LinearFunc {
-        static const float MAX_SLOPE;
-
-        float slope;
-        float height;
-        float xMin, xMax;
-        float yMin, yMax;
+        float slope;      // Rate of change
+        float height;     // Height above the arguments axis
+        float xMin, xMax; // Domain range
+        float yMin, yMax; // Values range
 
         LinearFunc();
         LinearFunc(float slope, float height);
@@ -61,9 +63,11 @@ namespace rp {
         float dot(const Vector2& other) const;
         float magnitude() const;
         Vector2 normalized() const;
-        Vector2 orthogonal() const;
-        Vector2 rotate(float radians) const;
+        Vector2 orthogonal() const;  // Vector that is clockwisely-perpendicular
+        Vector2 rotate(float radians) const;  // Vector rotated anti-clockwisely
 
+        bool operator==(const Vector2& other) const;
+        bool operator!=(const Vector2& other) const;
         Vector2 operator+(const Vector2& other) const;
         Vector2 operator-(const Vector2& other) const;
         Vector2 operator*(const float scalar) const;
