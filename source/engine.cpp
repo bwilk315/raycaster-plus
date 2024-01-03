@@ -438,8 +438,8 @@ namespace rp {
 
         #ifdef DEBUG
         if(frameIndex % iFramesPerSecond == 0) {
-            system("clear");
-            cout << "Delay [ms]: " << delay << "\n";
+            // system("clear");
+            // cout << "Delay [ms]: " << delay << "\n";
         }
         #endif
         

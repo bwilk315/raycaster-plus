@@ -28,31 +28,32 @@ namespace rp {
     }
     void WallData::updateBoundaryPoints() {
         if(func.slope == 0) {
-            bp0.x = 0;
+            bp0.x = func.xMin;
             bp0.y = func.height;
-            bp1.x = 1;
+            bp1.x = func.xMax;
             bp1.y = func.height;
             return;
         }
-        bp0.x = -1 * func.height / func.slope;
-        if(bp0.x < 0) {
-            bp0.x = 0;
-            bp0.y = func.height;
-        } else if(bp0.x > 1) {
-            bp0.x = 1;
-            bp0.y = func.slope + func.height;
+        // Very similar blocks, do not they?
+        bp0.x = (func.yMin - func.height) / func.slope;
+        if(bp0.x < func.xMin) {
+            bp0.x = func.xMin;
+            bp0.y = func.getValue(func.xMin);
+        } else if(bp0.x > func.xMax) {
+            bp0.x = func.xMax;
+            bp0.y = func.getValue(func.xMax);
         } else {
-            bp0.y = 0;
+            bp0.y = func.yMin;
         }
-        bp1.x = func.slope == 0 ? 1 : ((1 - func.height) / func.slope);
-        if(bp1.x < 0) {
-            bp1.x = 0;
-            bp1.y = func.height;
-        } else if(bp1.x > 1) {
-            bp1.x = 1;
-            bp1.y = func.slope + func.height; 
+        bp1.x = (func.yMax - func.height) / func.slope;
+        if(bp1.x < func.xMin) {
+            bp1.x = func.xMin;
+            bp1.y = func.getValue(func.xMin);
+        } else if(bp1.x > func.xMax) {
+            bp1.x = func.xMax;
+            bp1.y = func.getValue(func.xMax); 
         } else {
-            bp1.y = 1;
+            bp1.y = func.yMax;
         }
     }
     #ifdef DEBUG
@@ -150,16 +151,16 @@ namespace rp {
         if(tileWalls.count(tileId) == 0)
             tileWalls.insert(pair<int, vector<WallData>>(tileId, vector<WallData>()));
         // Add new wall details entry if needed, index of influenced wall is returned
-        size_t wallsCount = tileWalls.at(tileId).empty() ? 0 : tileWalls.at(tileId).size();
+        int wallsCount = tileWalls.at(tileId).empty() ? 0 : tileWalls.at(tileId).size();
         if(wallIndex < 0 || wallIndex > wallsCount - 1) {
-            tileWalls.at(tileId).push_back(newData);
-            return wallsCount;
+            wallIndex = wallsCount; // Force the proper wall index
+            tileWalls.at(tileId).push_back(WallData());
         }
         tileWalls.at(tileId).at(wallIndex) = newData;
         return wallIndex;
     }
     int Scene::loadTexture(const string& pngFile) {
-        if(texIds.count(pngFile))
+        if(texIds.count(pngFile) != 0)
             return texIds.at(pngFile);
         // Add a new texture entry, if loading failed then erase it, returns the texture ID
         int id = texIds.size() + 1;
@@ -266,33 +267,36 @@ namespace rp {
                     }
 
                     string textureFile = text.substr(1, tLen - 2); // Without double apostrophes
-                    uint16_t assignedId = loadTexture(textureFile);
-                    setTileWall(
-                        (int)stof(args.at(1)),
-                        -1, // Enforce new wall entry creation (to not override existing ones)
-                        WallData(
-                            LinearFunc(
-                                stof(args.at(3)),
-                                stof(args.at(4)),
-                                stof(args.at(6)),
-                                stof(args.at(7)),
-                                stof(args.at(8)),
-                                stof(args.at(9))
-                            ),
-                            encodeRGBA(
-                                // Add 1 to prevent the color from being pure black, because engine uses this color
-                                // in pixel-occupation status purposes.
-                                (uint8_t)clamp((int)stof(args.at(15)), MIN_CHANNEL, 255),
-                                (uint8_t)clamp((int)stof(args.at(16)), MIN_CHANNEL, 255),
-                                (uint8_t)clamp((int)stof(args.at(17)), MIN_CHANNEL, 255),
-                                (uint8_t)stof(args.at(18))
-                            ),
-                            stof(args.at(10)),
-                            stof(args.at(11)),
-                            assignedId,
-                            (bool)stof(args.at(13))
-                        )
-                    );
+                    int assignedId = loadTexture(textureFile);
+
+                    if(assignedId != 0) {
+                        setTileWall(
+                            (int)stof(args.at(1)),
+                            -1, // Enforce new wall entry creation (to not override existing ones)
+                            WallData(
+                                LinearFunc(
+                                    stof(args.at(3)),
+                                    stof(args.at(4)),
+                                    stof(args.at(6)),
+                                    stof(args.at(7)),
+                                    stof(args.at(8)),
+                                    stof(args.at(9))
+                                ),
+                                encodeRGBA(
+                                    // Add 1 to prevent the color from being pure black, because engine uses this color
+                                    // in pixel-occupation status purposes.
+                                    (uint8_t)clamp((int)stof(args.at(15)), MIN_CHANNEL, 255),
+                                    (uint8_t)clamp((int)stof(args.at(16)), MIN_CHANNEL, 255),
+                                    (uint8_t)clamp((int)stof(args.at(17)), MIN_CHANNEL, 255),
+                                    (uint8_t)stof(args.at(18))
+                                ),
+                                stof(args.at(10)),
+                                stof(args.at(11)),
+                                assignedId,
+                                (bool)stof(args.at(13))
+                            )
+                        );
+                    }
                     break;
                 }
                 default: {
