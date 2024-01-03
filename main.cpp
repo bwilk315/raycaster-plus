@@ -7,7 +7,7 @@ using namespace rp;
 int main() {
     Scene scene;
     int line = scene.loadFromFile("resources/my_world.rps");
-    std::cout << scene.getError() << " at " << line << std::endl;
+    std::cout << "Loading plane error " << scene.getError() << " at line " << line << std::endl;
     if(scene.getError())
         return 1;
     scene.loadTexture("resources/steve.png");
@@ -16,19 +16,19 @@ int main() {
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
     float turnSpeed = M_PI * 0.66f;
-    Camera camera(Vector2(1.5f, 1.5f), M_PI/2, fovAngle);
+    Camera camera(Vector2(1.5f, 1.5f), M_PI/2-0.001f, fovAngle);
     Engine engine(1000, 1000);
     bool lockCursor = false;
 
     engine.setCursorLock(lockCursor);
     engine.setCursorVisibility(!lockCursor);
-    engine.setColumnsPerRay(4);
     engine.setFrameRate(60);
     engine.setLightBehavior(true, 0);
-    engine.setMainCamera(&camera);
-    engine.setRowsInterval(4);
     engine.setWindowResize(true);
+    engine.setMainCamera(&camera);
     engine.setRenderFitMode(RenderFitMode::SQUARE);
+    engine.setColumnsPerRay(4);
+    engine.setRowsInterval(4);
     engine.getWalker()->setTargetScene(&scene);
     engine.getWalker()->setMaxTileDistance(21);
     
@@ -64,8 +64,8 @@ int main() {
                         x1 > x2 ? x1 : x2
                     ),
                     encodeRGBA(255, 128, 64, 255),
-                    0,
-                    1,
+                    0.0f,
+                    1.0f,
                     scene.getTextureId("resources/steve.png"),
                     0
                 )
@@ -97,7 +97,7 @@ int main() {
             camera.changePosition(
                 posChange * moveSpeed * engine.getElapsedTime() * mag
             );
-            engine.requestRedraw();
+            engine.requestRedraw(300, 300, 400, 400, true);
         }
 
         // Camera rotation 
@@ -124,5 +124,6 @@ int main() {
 
     }
 
+    std::cout << "Engine stopped with error code " << engine.getError() << std::endl;
     return 0;
 }

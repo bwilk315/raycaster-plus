@@ -17,10 +17,10 @@ namespace rp {
         return iss.eof() && !iss.fail();
     }
     int clamp(int value, int min, int max) {
-        return value < min ? min : (value > max ? max : value);
+        return value <= min ? min : (value >= max ? max : value);
     }
     float clamp(float value, float min, float max) {
-        return value < min ? min : (value > max ? max : value);
+        return value <= min ? min : (value >= max ? max : value);
     }
     uint32_t encodeRGBA(const uint8_t& r, const uint8_t& g, const uint8_t& b, const uint8_t& a) {
         return 0x01000000 * (16 * (r / 16) + r % 16) +

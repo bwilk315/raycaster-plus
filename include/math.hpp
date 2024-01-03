@@ -56,14 +56,18 @@ namespace rp {
         Vector2 normalized() const;
         Vector2 orthogonal() const;  // Vector that is clockwisely-perpendicular
         Vector2 rotate(float radians) const;  // Vector rotated anti-clockwisely
-
-        bool operator==(const Vector2& other) const;
-        bool operator!=(const Vector2& other) const;
-        Vector2 operator+(const Vector2& other) const;
-        Vector2 operator-(const Vector2& other) const;
-        Vector2 operator*(const float scalar) const;
-        Vector2 operator/(const float scalar) const;
     };
+    void operator+=(Vector2& a, const Vector2& b);
+    void operator-=(Vector2& a, const Vector2& b);
+    void operator*=(Vector2& vec, float scalar);
+    void operator/=(Vector2& vec, float scalar);
+    bool operator==(const Vector2& a, const Vector2& b);
+    bool operator!=(const Vector2& a, const Vector2& b);
+    Vector2 operator+(const Vector2& a, const Vector2& b);
+    Vector2 operator-(const Vector2& a, const Vector2& b);
+    Vector2 operator*(const Vector2& vec, float scalar);
+    Vector2 operator*(float scalar, const Vector2& vec);
+    Vector2 operator/(const Vector2& vec, float scalar);
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Vector2& vec);
     #endif

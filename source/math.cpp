@@ -81,23 +81,42 @@ namespace rp {
         float cos = cosf(radians);
         return Vector2(cos * x - sin * y, sin * x + cos * y);
     }
-    bool Vector2::operator==(const Vector2& other) const {
-        return this->x == other.x && this->y == other.y;
+    void operator+=(Vector2& a, const Vector2& b) {
+        a.x += b.x;
+        a.y += b.y;
     }
-    bool Vector2::operator!=(const Vector2& other) const {
-        return this->x != other.x || this->y != other.y;
+    void operator-=(Vector2& a, const Vector2& b) {
+        a.x -= b.x;
+        a.y -= b.y;
     }
-    Vector2 Vector2::operator+(const Vector2& other) const {
-        return Vector2(this->x + other.x, this->y + other.y);
+    void operator*=(Vector2& vec, float scalar) {
+        vec.x *= scalar;
+        vec.y *= scalar;
     }
-    Vector2 Vector2::operator-(const Vector2& other) const {
-        return Vector2(this->x - other.x, this->y - other.y);
+    void operator/=(Vector2& vec, float scalar) {
+        vec.x /= scalar;
+        vec.y /= scalar;
     }
-    Vector2 Vector2::operator*(const float scalar) const {
-        return Vector2(x * scalar, y * scalar);
+    bool operator==(const Vector2& a, const Vector2& b) {
+        return a.x == b.x && a.y == b.y;
     }
-    Vector2 Vector2::operator/(const float scalar) const {
-        return Vector2(x / scalar, y / scalar);
+    bool operator!=(const Vector2& a, const Vector2& b) {
+        return a.x != b.x || a.y != b.y;
+    }
+    Vector2 operator+(const Vector2& a, const Vector2& b) {
+        return Vector2(a.x + b.x, a.y + b.y);
+    }
+    Vector2 operator-(const Vector2& a, const Vector2& b) {
+        return Vector2(a.x - b.x, a.y - b.y);
+    }
+    Vector2 operator*(const Vector2& vec, float scalar) {
+        return Vector2(vec.x * scalar, vec.y * scalar);
+    }
+    Vector2 operator*(float scalar, const Vector2& vec) {
+        return vec * scalar;
+    }
+    Vector2 operator/(const Vector2& vec, float scalar) {
+        return Vector2(vec.x / scalar, vec.y / scalar);
     }
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Vector2& vec) {

@@ -29,9 +29,9 @@ namespace rp {
 
     /**
      * Offers stepping-based Digital Differential Analysis algorithm implementation, ray-stepping
-     * occurs on a scene (instance of `Scene` class) through its tile IDs. First set the target scene
-     * using `setTargetScene` method, you can also specify maximum distance of a ray from the starting
-     * point using method `setMaxTileDistance`.
+     * occurs on a scene (instance of `Scene` class) through its tile IDs (ID of 0 is ignored).
+     * First set the target scene using `setTargetScene` method, you can also specify maximum
+     * distance of a ray from the starting point using method `setMaxTileDistance`.
      * 
      * To start, tell the ray starting position and direction using `init` method, then simply call
      * `next` method to obtain the next hit information.

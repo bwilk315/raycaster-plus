@@ -66,7 +66,7 @@ namespace rp {
             }
             delete[] bytes;
         } else {
-            error = E_CANNOT_OPEN_FILE;
+            error = E_INVALID_FILE;
         }
         // If no error occurred structure captured pixel data, now it has to be freed
         if(!error)

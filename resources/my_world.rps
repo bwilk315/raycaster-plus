@@ -17,7 +17,7 @@ w 4 0 0 9 10 0 0 0 9 0 2
 w 4 0 0 9 0 10 0 0 9 0 2
 w 4 0 0 9 0 0 0 10 9 0 2
 w 4 0 0 9 0 0 0 0 9 0 2
-w 4 0 0 11 11 11 11 11 0 0 2
+w 4 0 12 11 11 11 11 11 0 0 2
 w 4 0 0 0 0 0 0 0 0 0 2
 w 0 3 3 3 3 3 3 3 3 3 0
 
@@ -48,9 +48,8 @@ t 8 l 0 0.75 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/demon.png"
 
 # Planks
 t 9 l 10000 0 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/planks.png"
-t 9 l 10000 0 d 0 1 0.2 0.8 1 2 r 0 c 255 255 255 255 x "resources/planks.png"
-t 11 l 0 1 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/cat.jpeg"
-
+t 9 l 10000 0 d 0 1 0 1 1 2 r 0 c 255 255 255 255 x "resources/planks.png"
+t 11 l 0 1 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x "resources/planks_window.png"
 
 # Variable walls (I assume they can be dynamically changed through code)
 t 10 l 0 0 d 0 1 0 1 0 1 r 0 c 255 255 255 255 x ""

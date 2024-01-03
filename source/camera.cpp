@@ -21,12 +21,12 @@ namespace rp {
         plane = plane.rotate(radians);
     }
     void Camera::changePosition(Vector2 change) {
-        position = position + change;
+        position += change;
     }
     void Camera::setDirection(float radians) {
         // Applying small errors sometimes guarantee infinite-slope-immune behaviour
         direction = (Vector2::RIGHT).rotate(
-            (abs(radians) == M_PI_2) ? (radians - DIR_BIAS) : (radians)
+            radians - (abs(radians) == M_PI_2 ? DIR_BIAS : 0)
         );
         plane = (Vector2::DOWN).rotate(
             (radians == 0 || radians == M_PI) ? (radians - DIR_BIAS) : (radians)
@@ -34,7 +34,7 @@ namespace rp {
     }
     void Camera::setFieldOfView(float radians) {
         fieldOfView = clamp(radians, Camera::MIN_FOV, Camera::MAX_FOV);
-        plane = plane * (1 / planeMagnitude); // Make the plane a unit vector
+        plane = plane / planeMagnitude; // Make the plane a unit vector
         planeMagnitude = tanf(radians / 2);
         plane = plane * planeMagnitude; // Apply new magnitude of the plane vector
     }

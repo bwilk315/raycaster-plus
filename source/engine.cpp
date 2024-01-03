@@ -38,35 +38,55 @@ namespace rp {
         return hit;
     }
     Engine::Engine(int screenWidth, int screenHeight) {
-        this->bIsCursorLocked = false;
-        this->bLightEnabled = false;
-        this->bRun = true;
-        this->bRedraw = false;
-        this->iColumnsPerRay = 4;
-        this->iScreenWidth = screenWidth;
-        this->iScreenHeight = screenHeight;
-        this->fAspectRatio = screenHeight / (float)screenWidth;
-        this->fSumFPS = 0.0f;
-        this->fMaxTileDist = 16.0f;
-        this->frameIndex = 0;
-        this->vLightDir = Vector2::RIGHT;
-        this->tpLast = system_clock::now();
-        this->keyStates = map<int, KeyState>();
-        this->walker = new DDA();
-        setFrameRate(60);
-        setWindowResize(true);
+        this->bAllowWindowResize = false;
+        this->bLimitClear             = false;
+        this->bIsCursorLocked    = false;
+        this->bLightEnabled      = false;
+        this->bRedraw            = false;
+        this->bRun               = true;
+        this->iError             = E_CLEAR;
+        this->iColumnsPerRay     = 0;
+        this->iFramesPerSecond   = 0;
+        this->iRenderWidth       = 0;
+        this->iRenderHeight      = 0;
+        this->iRowsInterval      = 0;
+        this->iHorOffset         = 0;
+        this->iScreenWidth       = screenWidth;
+        this->iScreenHeight      = screenHeight;
+        this->iVerOffset         = 0;
+        this->fAspectRatio       = screenHeight / (float)screenWidth;
+        this->frameIndex         = 0;
+        this->renderFitMode      = RenderFitMode::UNKNOWN;
+        this->vLightDir          = Vector2::RIGHT;
+        this->tpLast             = system_clock::now();
+        this->elapsedTime        = duration<float>(0);
+        this->rRedrawArea        = {};
+        this->keyStates          = map<int, KeyState>();
 
-        SDL_InitSubSystem(SDL_INIT_VIDEO);
-        this->sdlWindow = SDL_CreateWindow("Raycaster Plus Engine", 0, 0, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
-        SDL_SetWindowResizable(this->sdlWindow, SDL_TRUE);
-        updateSurface();
+        if(SDL_InitSubSystem(SDL_INIT_VIDEO) == 0) {
+            this->pixels     = nullptr;
+            this->mainCamera = nullptr;
+            this->walker     = new DDA();
+            this->sdlSurface = nullptr;
+            this->sdlWindow  = SDL_CreateWindow("Raycaster Plus Engine", 0, 0, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
+            if(sdlWindow != nullptr) {
+                SDL_SetWindowResizable(this->sdlWindow, SDL_TRUE);
+                updateSurface();
+                return;
+            }
+        }
+        iError |= E_SDL;
     }
     Engine::~Engine() {
-        SDL_DestroyWindow(sdlWindow);
-        SDL_QuitSubSystem(SDL_INIT_VIDEO);
-        SDL_Quit();
         if(walker != nullptr)
             delete walker;
+
+        // SDL owns pixel and surface data, so no need to free it by hand
+        if(iError != E_SDL) {
+            SDL_DestroyWindow(sdlWindow);
+            SDL_QuitSubSystem(SDL_INIT_VIDEO);
+            SDL_Quit();
+        }
     }
     void Engine::stop() {
         bRun = false;
@@ -78,7 +98,11 @@ namespace rp {
         SDL_ShowCursor(visible ? SDL_ENABLE : SDL_DISABLE);
     }
     void Engine::setColumnsPerRay(int columns) {
-        iColumnsPerRay = clamp(columns, 1, getRenderWidth());
+        if(iRenderWidth == 0) {
+            iError |= E_WRONG_CALL_ORDER;
+        } else {
+            iColumnsPerRay = clamp(columns, 1, getRenderWidth());
+        }
     }
     void Engine::setFrameRate(int framesPerSecond) {
         iFramesPerSecond = clamp(framesPerSecond, 1, 512);
@@ -87,29 +111,28 @@ namespace rp {
         bLightEnabled = enabled;
         vLightDir = (Vector2::RIGHT).rotate(angle);
     }
-    void Engine::setMainCamera(Camera* camera) {
+    void Engine::setMainCamera(const Camera* camera) {
         mainCamera = camera;
     }
     void Engine::setRowsInterval(int interval) {
-        iRowsInterval = clamp(interval, 1, getRenderHeight());
+        if(iRenderHeight == 0) {
+            iError |= E_WRONG_CALL_ORDER;
+        } else {
+            iRowsInterval = clamp(interval, 1, getRenderHeight());
+        }
     }
-    void Engine::setWindowResize(bool enabled) {
-        bAllowWindowResize = enabled;
-        SDL_SetWindowResizable(sdlWindow, (SDL_bool)enabled);
-    }
-    void Engine::requestRedraw() {
-        bRedraw = true;
-    }
-    int Engine::setRenderFitMode(const RenderFitMode& rfm) {
-        if(mainCamera == nullptr)
-            return Engine::E_MAIN_CAMERA_NOT_SET;
-        
+    void Engine::setRenderFitMode(const RenderFitMode& rfm) {
+        if(mainCamera == nullptr && rfm != RenderFitMode::UNKNOWN) {
+            iError |= E_MAIN_CAMERA_NOT_SET;
+            return;
+        }
         renderFitMode = rfm;
         switch(rfm) {
             case RenderFitMode::STRETCH:
                 iHorOffset = 0;
                 iVerOffset = 0;
-                iColumnsCount = iScreenWidth;
+                iRenderWidth = iScreenWidth;
+                iRenderHeight = iScreenHeight;
                 break;
             case RenderFitMode::SQUARE:
                 // Set up horizontal and vertical offsets for drawing columns to make the rendered
@@ -117,15 +140,44 @@ namespace rp {
                 if(iScreenWidth > iScreenHeight) {
                     iHorOffset = (iScreenWidth - iScreenHeight) / 2;
                     iVerOffset = 0;
-                    iColumnsCount = iScreenHeight;
+                    iRenderWidth = iScreenHeight;
+                    iRenderHeight = iScreenHeight;
                 } else {
                     iHorOffset = 0;
                     iVerOffset = (iScreenHeight - iScreenWidth) / 2;
-                    iColumnsCount = iScreenWidth;
+                    iRenderWidth = iScreenWidth;
+                    iRenderHeight = iScreenWidth;
                 }
                 break;
         }
-        return Engine::E_CLEAR;
+    }
+    void Engine::setWindowResize(bool enabled) {
+        if(sdlWindow == nullptr)
+            return;
+        bAllowWindowResize = enabled;
+        SDL_SetWindowResizable(sdlWindow, (SDL_bool)enabled);
+    }
+    void Engine::requestRedraw() {
+        bLimitClear = true;
+        bRedraw = true;
+        rRedrawArea.x = iHorOffset;
+        rRedrawArea.y = iVerOffset;
+        rRedrawArea.w = getRenderWidth();
+        rRedrawArea.h = getRenderHeight();
+    }
+    void Engine::requestRedraw(int x, int y, int w, int h, bool limited) {
+        bLimitClear = limited;
+        bRedraw = true;
+        rRedrawArea.x = x;
+        rRedrawArea.y = y;
+        rRedrawArea.w = clamp(w, 0, getRenderWidth() - x);
+        rRedrawArea.h = clamp(h, 0, getRenderHeight() - y);
+    }
+    int Engine::getError() const {
+        return iError;
+    }
+    int Engine::getFrameCount() const {
+        return frameIndex;
     }
     int Engine::getScreenWidth() const {
         return iScreenWidth;
@@ -134,10 +186,10 @@ namespace rp {
         return iScreenHeight;
     }
     int Engine::getRenderWidth() {
-        return (renderFitMode == RenderFitMode::STRETCH) ? (iScreenWidth) : (iColumnsCount);
+        return iRenderWidth;
     }
     int Engine::getRenderHeight() {
-        return (renderFitMode == RenderFitMode::STRETCH) ? (iScreenHeight) : (iColumnsCount);
+        return iRenderHeight;
     }
     float Engine::getElapsedTime() const {
         return elapsedTime.count();
@@ -152,6 +204,10 @@ namespace rp {
         return sdlWindow;
     }
     bool Engine::tick() {
+        if(iError) {
+            stop();
+            return false;
+        }
 
         // Compute the time duration elapsed since the last method call
         time_point<system_clock> tpCurrent = system_clock::now();
@@ -208,8 +264,6 @@ namespace rp {
         /********************************************/
         /********************************************/
 
-        int renderWidth = getRenderWidth();
-        int renderHeight = getRenderHeight();
         // Perspective-correct minimum distance; if you stand this distance from the cube looking at it orthogonally,
         // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
         // located at height of 1/2.
@@ -223,22 +277,26 @@ namespace rp {
         const float planeSlope = planeVec.y / planeVec.x;
         LinearFunc planeLine(planeSlope, camPos.y - planeSlope * camPos.x, 0, 1);
 
+        int column;
         if(bRedraw) {
             // Clear the entire screen buffer
             SDL_LockSurface(sdlSurface);
-            SDL_memset(pixels, 0, sdlSurface->pitch * sdlSurface->h);
+            SDL_FillRect(
+                sdlSurface,
+                bLimitClear ? &rRedrawArea : NULL,
+                0
+            );
             SDL_UnlockSurface(sdlSurface);
+            column = rRedrawArea.x;
         } else {
             // Skip drawing process if redrawing is not requested
-            renderWidth = 0;
-            elapsedTime = duration<float>(1.0f / iFramesPerSecond);
+            column = rRedrawArea.x + rRedrawArea.w;
         }
-
         // Draw the current frame, which consists of pixel columns
-        for(int column = 0; column < renderWidth; column += iColumnsPerRay) {
+        for( ; column < rRedrawArea.x + rRedrawArea.w; column += iColumnsPerRay) {
 
             // Position of the ray on the camera plane, from -1 (left) to 1 (right)
-            float cameraX = 2 * column / (float)iColumnsCount - 1;
+            float cameraX = 2 * column / (float)iRenderWidth - 1;
             Vector2 rayDir = (camDir + planeVec * cameraX).normalized();
             LinearFunc rayLine;  // Line equation describing the ray walk
             // Ray slope stays constant for all hits
@@ -252,6 +310,9 @@ namespace rp {
             bool wasAnyHit = false;
 
             while(keepWalking) {
+                if(walker->rayFlag == DDA::RF_FAIL)
+                    break;
+
                 RayHitInfo hit = originDone ? walker->next() : simulateBoundaryEnter(camPos, rayDir);
 
                 // If next tiles are unreachable, or nearest wall was found exit the loop
@@ -260,7 +321,7 @@ namespace rp {
                     break;
                 // If a ray touched an air tile (with data of 0), skip it
                 else if(!(walker->rayFlag & DDA::RF_HIT))
-                    continue;           
+                    continue;
 
                 // Update the ray line intercept according to the ray hit point
                 float rayIntX;
@@ -277,8 +338,10 @@ namespace rp {
                 // Find the nearest wall in the obtained non-air tile
                 int tileData = mainScene->getTileId(hit.tile.x, hit.tile.y);
 
+                // IT WORKS BUT ... THIS HAVE TO BE CHANGED IN THE FUTURE FOR KNOWN REASONS ...
                 // Compute additional information of the walls, store them in a map that will sort them by distance
                 vector<WallData> details = mainScene->getTileWalls(tileData);
+
                 map<float, pair<int, Vector2>> additional; // Key: distance, Value: ( Key: index, Value: intersection )
 
                 int reps = 0; // Wall line repetitions
@@ -302,7 +365,7 @@ namespace rp {
 
                     additional.insert(pair<float, pair<int, Vector2>>(planeDist, pair<int, Vector2>(i, inter)));
                 }
-                
+
                 // Draw buffer
                 for(const auto& extra : additional) {
 
@@ -320,19 +383,20 @@ namespace rp {
                         normal = normal * -1;
                         isNormalFlipped = true;
                     }
+
                     // Prevent drawing things that are behind the camera, it is caused by finding intersections in the
                     // origin tile, there are always two but only one is in front of the camera (detected using dot product).
                     if(!originDone && rayDir.dot(normal) > 0)
                         continue;
                     
                     // Find out range describing how column should be drawn for the current wall
-                    int lineHeight = renderHeight * (pcmDist / planeDist);
-                    int drawStart  = (renderHeight / 2 - lineHeight / 2);
-                    int drawEnd    = (renderHeight / 2 + lineHeight / 2);
+                    int lineHeight = iRenderHeight * (pcmDist / planeDist);
+                    int drawStart  = (iRenderHeight / 2 - lineHeight / 2);
+                    int drawEnd    = (iRenderHeight / 2 + lineHeight / 2);
                     // Compute starting and ending height according to the wall height range
                     int limStart   = drawStart + (1 - wd.hMax) * lineHeight;
                     int limEnd     = drawEnd - wd.hMin * lineHeight;
-                    int limHeight  = drawEnd - drawStart;
+                    int limHeight  = limEnd - limStart;
                     // Index of the screen buffer at which drawing will start, in upper direction
                     int currIndex = (iVerOffset + limEnd) * sdlSurface->w + iHorOffset + column;
 
@@ -345,55 +409,55 @@ namespace rp {
 
                     SDL_LockSurface(sdlSurface);
                     int leClip = 0; // Height below which line is invisible
-                    if(limEnd >= renderHeight) {
-                        leClip = limEnd - renderHeight;
+                    int renderEnd = rRedrawArea.y + rRedrawArea.h;
+                    if(limEnd >= renderEnd) {
+                        leClip = limEnd - renderEnd + 1;
                         currIndex -= leClip * sdlSurface->w;
                         limEnd -= leClip;
                     }
+
                     for(int h = leClip; h < limHeight; h += iRowsInterval) {
-                        //  PROBLEM: BLACK PIXELS ARE SOMEHOW OMITTED DURING THE DRAWING
 
-                        if(limEnd < 0) {
+                        if(limEnd < rRedrawArea.y)
                             break;
-                        } else if(limEnd < renderHeight) {
-                            uint8_t wr, wg, wb, wa; // Wall color
-                            decodeRGBA(
-                                (tex == nullptr) ? wd.tint : tex->getCoords(planeNormX, h / (float)limHeight),
-                                wr, wg, wb, wa
-                            );
 
-                            if(wa != 0) {
-                                uint8_t cr, cg, cb, ca; // Current color
-                                decodeRGBA(pixels[currIndex], cr, cg, cb, ca);
+                        uint8_t wr, wg, wb, wa; // Wall color
+                        decodeRGBA(
+                            (tex == nullptr) ? wd.tint : tex->getCoords(planeNormX, h / (float)limHeight),
+                            wr, wg, wb, wa
+                        );
 
-                                // Set screen buffer pixel if it is not already (meaning it is pure black),
-                                // This trick is only possible because texture loader is made to alter black to not be so pure.
-                                if(cr + cg + cb < MIN_CHANNEL) {
+                        if(wa != 0) {
+                            uint8_t cr, cg, cb, ca; // Current color
+                            decodeRGBA(pixels[currIndex], cr, cg, cb, ca);
 
-                                    // Apply shading if light source is enabled
-                                    if(bLightEnabled) {
-                                        const float minBn = 0.2f;
-                                        float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
-                                        float bn = minBn + (1 - minBn) * perc; // Final brightness
-                                        wr *= bn;
-                                        wg *= bn;
-                                        wb *= bn;
-                                    }
+                            // Set screen buffer pixel if it is not already (meaning it is pure black),
+                            // This trick is only possible because texture loader is made to alter black to not be so pure.
+                            if(cr + cg + cb < MIN_CHANNEL) {
 
-                                    for(int i = 0; i < iColumnsPerRay; i++) {
-                                        if(column + i == renderWidth)
+                                // Apply shading if light source is enabled
+                                if(bLightEnabled) {
+                                    const float minBn = 0.2f;
+                                    float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
+                                    float bn = minBn + (1 - minBn) * perc; // Final brightness
+                                    wr *= bn;
+                                    wg *= bn;
+                                    wb *= bn;
+                                }
+
+                                for(int i = 0; i < iColumnsPerRay; i++) {
+                                    if(column + i == iRenderWidth)
+                                        break;
+                                    for(int j = 0; j < iRowsInterval; j++) {
+                                        if(limEnd - j < 0)
                                             break;
-                                        for(int j = 0; j < iRowsInterval; j++) {
-                                            if(limEnd - j < 0)
-                                                break;
-                                            // Use SDL-provided function for converting RGBA color in appropriate way to a single number
-                                            pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGB(
-                                                sdlSurface->format,
-                                                clamp(wr, MIN_CHANNEL, 255),
-                                                clamp(wg, MIN_CHANNEL, 255),
-                                                clamp(wb, MIN_CHANNEL, 255)
-                                            );
-                                        }
+                                        // Use SDL-provided function for converting RGBA color in appropriate way to a single number
+                                        pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGB(
+                                            sdlSurface->format,
+                                            clamp(wr, MIN_CHANNEL, 255),
+                                            clamp(wg, MIN_CHANNEL, 255),
+                                            clamp(wb, MIN_CHANNEL, 255)
+                                        );
                                     }
                                 }
                             }
@@ -417,8 +481,8 @@ namespace rp {
                 continue; // Ray ended his walk and hit nothing, skip the iteration
 
             #ifdef DEBUG
-            if(abs(column - iColumnsCount / 2) <= iColumnsPerRay) {
-                for(int i = 0; i < renderHeight; i++)
+            if(abs(column - iRenderWidth / 2) <= iColumnsPerRay) {
+                for(int i = 0; i < iRenderHeight; i++)
                     pixels[iScreenWidth / 2 + i * sdlSurface->w] = 0xffffff;
             }
             #endif
@@ -438,8 +502,8 @@ namespace rp {
 
         #ifdef DEBUG
         if(frameIndex % iFramesPerSecond == 0) {
-            // system("clear");
-            // cout << "Delay [ms]: " << delay << "\n";
+            system("clear");
+            cout << "Delay [ms]: " << delay << "\n";
         }
         #endif
         

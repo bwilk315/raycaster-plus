@@ -52,14 +52,18 @@ namespace rp {
         return scene;
     }
     void DDA::init(const Vector2& start, const Vector2& direction) {
+        if(scene == nullptr) {
+            rayFlag = RF_FAIL;
+            return;
+        }
         this->start = start;
         this->direction = direction;
         this->initialized = true;
 
         planePosX = (int)start.x;
         planePosY = (int)start.y;
-        deltaDistX = direction.x == 0 ? DDA::MAX_DD : std::abs(1 / direction.x);
-        deltaDistY = direction.y == 0 ? DDA::MAX_DD : std::abs(1 / direction.y);
+        deltaDistX = direction.x == 0 ? MAX_DD : std::abs(1 / direction.x);
+        deltaDistY = direction.y == 0 ? MAX_DD : std::abs(1 / direction.y);
         // Set initial distances and stepping direction
         if(direction.x < 0) {
             stepX = -1;
@@ -75,8 +79,6 @@ namespace rp {
             stepY = 1;
             sideDistY = (1 + planePosY - start.y) * deltaDistY;
         }
-        // State for the first hit
-        this->rayFlag = sideDistX < sideDistY ? DDA::RF_SIDE : DDA::RF_CLEAR;
     }
     RayHitInfo DDA::next() {
         if(!initialized) {

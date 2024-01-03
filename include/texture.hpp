@@ -34,7 +34,7 @@ namespace rp {
         public:
             enum {
                 E_CLEAR,
-                E_CANNOT_OPEN_FILE,
+                E_INVALID_FILE,
                 E_FAILED_READING_FILE,
                 E_INVALID_POSITION
             };

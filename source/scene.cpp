@@ -96,6 +96,9 @@ namespace rp {
     Scene::~Scene() {
         if(tiles != nullptr)
             delete[] tiles;
+        tileWalls.clear();
+        texSources.clear();
+        texIds.clear();
     }
     bool Scene::checkPosition(int x, int y) const {
         return (x > -1 && x < width) && (y > -1 && y < height);
