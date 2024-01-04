@@ -24,8 +24,8 @@ int main() {
     engine.setCursorVisibility(!lockCursor);
     engine.setFrameRate(60);
     engine.setLightBehavior(true, 0);
-    engine.setWindowResize(true);
     engine.setMainCamera(&camera);
+    engine.setWindowResize(true);
     engine.setRenderFitMode(RenderFitMode::SQUARE);
     engine.setColumnsPerRay(4);
     engine.setRowsInterval(4);
@@ -35,7 +35,42 @@ int main() {
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
     bool efBillboard = true;
+    bool isTransforming = false;
+    bool isFreezed = false;
+    
     while(engine.tick()) {
+        if(isTransforming) {
+            int frame = engine.getFrameCount();
+            SDL_Rect r = engine.getRenderArea();
+
+            if(frame % 1 == 0) {
+                engine.clear({ 500-150, 500-150, 300, 300 });
+                engine.render({ 500-150, 500-150, 300, 300 });
+            }
+            if(frame % 2 == 0) {
+                engine.clear({ 500-250, 500-250, 500, 500 });
+                engine.render({ 500-250, 500-250, 500, 500 });
+            }
+            if(frame % 4 == 0) {
+                engine.clear({ 500-350, 500-350, 700, 700 });
+                engine.render({ 500-350, 500-350, 700, 700 });
+            }
+            if(frame % 6 == 0) {
+                engine.clear({ 500-450, 500-450, 900, 900 });
+                engine.render({ 500-450, 500-450, 900, 900 });
+            }
+            if(frame % 8 == 0) {
+                engine.clear();
+                engine.render();
+            }
+
+            isFreezed = false;
+            isTransforming = false;
+        } else if(!isFreezed) {
+            engine.clear();
+            engine.render();
+            isFreezed = true;
+        }
 
         if(efBillboard) {
             // Plane is always looking at the player, appears flat
@@ -97,7 +132,7 @@ int main() {
             camera.changePosition(
                 posChange * moveSpeed * engine.getElapsedTime() * mag
             );
-            engine.requestRedraw(300, 300, 400, 400, true);
+            isTransforming = true;
         }
 
         // Camera rotation 
@@ -108,17 +143,17 @@ int main() {
             int mouseDeltaX = currMouseX - engine.getScreenWidth() / 2;
             if(mouseDeltaX != 0) {
                 camera.changeDirection(-1 * turnSpeed * mouseDeltaX * engine.getElapsedTime());
-                engine.requestRedraw();
+                isTransforming = true;
             }
         } else {
             // Keyboard based
             if(engine.getKeyState(SDL_SCANCODE_RIGHT) == KeyState::PRESS) {
                 camera.changeDirection(-1 * turnSpeed * engine.getElapsedTime());
-                engine.requestRedraw();
+                isTransforming = true;
             }
             if(engine.getKeyState(SDL_SCANCODE_LEFT) == KeyState::PRESS) {
                 camera.changeDirection(turnSpeed * engine.getElapsedTime());
-                engine.requestRedraw();
+                isTransforming = true;
             }
         }
 
