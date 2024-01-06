@@ -19,6 +19,7 @@ namespace rp {
     #ifdef DEBUG
     using ::std::cout;
     using ::std::endl;
+    using ::std::ostream;
     #endif
     using ::std::chrono::time_point;
     using ::std::chrono::system_clock;
@@ -37,6 +38,19 @@ namespace rp {
         STRETCH, // Render gets stretched to fill the whole screen area
         SQUARE   // Render is the biggest square possible to fit with the current resolution
     };
+
+    struct ColumnDrawInfo {
+        float perpDist;              // Perpendicular distance from wall hit point to the camera plane
+        Vector2 localInter;          // Point of ray-wall lines intersection in local tile coordinates
+        const WallData* wallDataPtr; // Pointer to the hit wall structure
+
+        ColumnDrawInfo();
+        ColumnDrawInfo(float perpDist, const Vector2& localInter, const WallData* wallDataPtr);
+    };
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const ColumnDrawInfo& cdi);
+    #endif
+
 
     class Engine {
         private:

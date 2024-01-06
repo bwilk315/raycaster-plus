@@ -145,10 +145,10 @@ namespace rp {
             return nullptr;
         return &texSources.at(texIds.at(rpsFile));
     }
-    vector<WallData> Scene::getTileWalls(int tileId) const {
+    const vector<WallData>* Scene::getTileWalls(int tileId) const {
         if(tileWalls.count(tileId) == 0)
-            return vector<WallData>();
-        return tileWalls.at(tileId);
+            return nullptr;
+        return &tileWalls.at(tileId);
     }
     int Scene::setTileWall(int tileId, int wallIndex, WallData newData) {
         if(tileWalls.count(tileId) == 0)

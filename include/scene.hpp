@@ -97,8 +97,8 @@ namespace rp {
             string getTextureName(int texId) const;
             const Texture* getTextureSource(int texId) const;
             const Texture* getTextureSource(const string& rpsFile) const;
-            // Returns vector of walls data defined for the specified tile, or empty vector on fail
-            vector<WallData> getTileWalls(int tileId) const;
+            // Returns pointer to a vector of walls data defined for the specified tile, or null pointer on fail
+            const vector<WallData>* getTileWalls(int tileId) const;
             // Returns index of the influenced wall, if necessary new wall is created
             int setTileWall(int tileId, int wallIndex, WallData newData);
             // Returns ID of the loaded texture, or 0 on fail

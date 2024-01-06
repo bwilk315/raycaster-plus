@@ -3,6 +3,28 @@
 
 namespace rp {    
 
+    /*************************************************/
+    /********** STRUCTURE: COLUMN DRAW INFO **********/
+    /*************************************************/
+
+    ColumnDrawInfo::ColumnDrawInfo() {
+        this->perpDist = -1;
+        this->localInter = Vector2::ZERO;
+        this->wallDataPtr = nullptr;
+    }
+    ColumnDrawInfo::ColumnDrawInfo(float perpDist, const Vector2& localInter, const WallData* wallDataPtr) {
+        this->perpDist = perpDist;
+        this->localInter = localInter;
+        this->wallDataPtr = wallDataPtr;
+    }
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const ColumnDrawInfo& cdi) {
+        stream << "ColumnDrawInfo(perpDist=" << cdi.perpDist << ", localInter=" << cdi.localInter;
+        stream << ", wallData=" << *cdi.wallDataPtr << ")";
+        return stream;
+    }
+    #endif
+
     /***********************************/
     /********** CLASS: ENGINE **********/
     /***********************************/
@@ -278,81 +300,87 @@ namespace rp {
                 // Sort walls by their distance to the camera plane in ascending order (not done yet)
 
                 int tileData = mainScene->getTileId(hit.tile.x, hit.tile.y);
+                const vector<WallData>* wallData = mainScene->getTileWalls(tileData);
+                if(wallData == nullptr)
+                    continue;
 
-                // Compute additional information of the walls, store them in a map that will sort them by distance
-                vector<WallData> details = mainScene->getTileWalls(tileData);
-
-                map<float, pair<int, Vector2>> additional; // Key: distance, Value: ( Key: index, Value: intersection )
-
-                int reps = 0; // Wall line repetitions
-                for(int i = 0; i < details.size(); i++) {
-                    WallData* wdp = &details.at(i);
+                // Collect draw information as pointers to dedicated structure
+                int wallCount = wallData->size();
+                int dipLen = 0; // drawInfoPtrs length
+                ColumnDrawInfo* drawInfoPtrs[wallCount]; // Contains nullptrs if ray misses a wall
+                for(int i = 0; i != wallCount; i++) {
+                    ColumnDrawInfo* cdi = new ColumnDrawInfo;
+                    cdi->wallDataPtr = &wallData->at(i);
 
                     // COMPUTATION WITHOUT USING SQUARE ROOT (can be simplified further)
                     // The formula below was derived by parts, and compressed into one long computation
                     // NOTE: this formula works even when enter point is actually inside a tile
-                    float a = wdp->func.slope;
-                    float h = wdp->func.height;
+                    float a = cdi->wallDataPtr->func.slope;
+                    float h = cdi->wallDataPtr->func.height;
                     float interDist = ( rayEnter.y - a * rayEnter.x - ( h == 0 ? SAFE_LINE_HEIGHT : h ) ) / ( rayDir.x * a - rayDir.y );
-                    
-                    // #ifdef DEBUG
-                    // if(column == iScreenWidth / 2) {
-                    //     cout << interDist << endl;
-                    // }
-                    // #endif
 
                     // Distance is negative when a wall is not reached by the ray, this and the fact that the longest
                     // distance in tile boundary is 1/sqrt(2), can be used to perform early classification.
-                    if(interDist < 0 || interDist > INV_SQRT2)
-                        continue;
+                    if(interDist >= 0 && interDist <= INV_SQRT2) {
+                        cdi->localInter = interDist * rayDir + rayEnter;
 
-                    Vector2 inter = interDist * rayDir + rayEnter;
+                        // Check if point is included in arguments and values range
+                        if((cdi->localInter.x >= cdi->wallDataPtr->func.xMin && cdi->localInter.x <= cdi->wallDataPtr->func.xMax) &&
+                           (cdi->localInter.y >= cdi->wallDataPtr->func.yMin && cdi->localInter.y <= cdi->wallDataPtr->func.yMax)) {
 
-                    // Check if point is included in arguments and values range, if not skip it
-                    if((inter.x < wdp->func.xMin || inter.x > wdp->func.xMax) ||
-                       (inter.y < wdp->func.yMin || inter.y > wdp->func.yMax)) {
-                        continue;
+                            cdi->perpDist = rayDir.dot(camDir) * ( hit.distance + interDist );
+                            drawInfoPtrs[i] = cdi;
+                            dipLen++;
+                            continue;
+                        }
                     }
 
-                    float planeDist = rayDir.dot(camDir) * ( hit.distance + interDist );
-
-                    // Plane distance must be unique, because it is a key of map
-                    if(additional.count(planeDist) != 0)
-                        planeDist += 1e-5f * ++reps;
-
-                    additional.insert(pair<float, pair<int, Vector2>>(planeDist, pair<int, Vector2>(i, inter)));
+                    // Ray missed that wall, therefore its information is garbage, leave it unset
+                    drawInfoPtrs[i] = nullptr;
+                    delete cdi;
                 }
 
-                // Draw buffer
-                for(const auto& extra : additional) {
+                // Sort the information in ascending order, perform it on pointers to avoid copying
+                for(int i = 0; i != wallCount; i++) {
+                    for(int j = 1; j != wallCount; j++) {
+                        if(drawInfoPtrs[j] != nullptr && (drawInfoPtrs[j - 1] == nullptr || drawInfoPtrs[j - 1]->perpDist > drawInfoPtrs[j]->perpDist)) {
+                            ColumnDrawInfo* temp = drawInfoPtrs[j];
+                            drawInfoPtrs[j] = drawInfoPtrs[j - 1];
+                            drawInfoPtrs[j - 1] = temp;
+                        } else {
+                            break;
+                        }
+                    }
+                }
 
-                    const float planeDist = extra.first;
-                    const Vector2 inter = extra.second.second;
-                    const WallData wd = details.at(extra.second.first);
+                // THIS NEEDS TO BE REMADE, IT CANT BE THAT DRAWING IS DONE BY CHECKING EVERY PIXEL
+                // First walls are valid pointers, nullptrs are left far away
+                for(int i = 0; i != dipLen; i++) {
+                    ColumnDrawInfo* cdi = drawInfoPtrs[i];
 
                     // Find normal vector that always points out of the wall plane
                     bool isNormalFlipped = false;
-                    float normAngle = (wd.func.slope == 0) ? (-1 * M_PI_2) : (atanf(1 / wd.func.slope * -1));
-                    float val = wd.func.slope * (camPos.x - hit.tile.x) + wd.func.height;
+                    float normAngle = (cdi->wallDataPtr->func.slope == 0) ? (-1 * M_PI_2) : (atanf(1 / cdi->wallDataPtr->func.slope * -1));
+                    float val = cdi->wallDataPtr->func.slope * (camPos.x - hit.tile.x) + cdi->wallDataPtr->func.height;
                     float globalPosInterY = val + hit.tile.y;
                     Vector2 normal = (Vector2::RIGHT).rotate(normAngle);
-                    if( (wd.func.slope >= 0 && camPos.y > globalPosInterY) || // If camera is above the line or below
-                        (wd.func.slope  < 0 && camPos.y < globalPosInterY)) { // it, normal needs to be flipped.
+                    if( (cdi->wallDataPtr->func.slope >= 0 && camPos.y > globalPosInterY) || // If camera is above the line or below
+                        (cdi->wallDataPtr->func.slope  < 0 && camPos.y < globalPosInterY)) { // it, normal needs to be flipped.
                         normal = normal * -1;
                         isNormalFlipped = true;
                     }
 
                     // Find out range describing how column should be drawn for the current wall
-                    int lineHeight  = rRenderArea.h * (pcmDist / planeDist);
-                    int drawStart   = (rRenderArea.h + lineHeight) / 2 - lineHeight * wd.hMin;
-                    int drawEnd     = (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - wd.hMax);
+                    int lineHeight  = rRenderArea.h * (pcmDist / cdi->perpDist);
+                    int drawStart   = (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
+                    int drawEnd     = (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
                     int startClip   = drawStart > rRenderArea.h ? (drawStart - rRenderArea.h) : 0;
                     int totalHeight = drawStart - drawEnd;
 
-                    const Texture* tex = mainScene->getTextureSource(wd.texId);
+                    const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
                     int texHeight = tex == nullptr ? 1 : tex->getHeight();
                     // Compute normalized horizontal position on the wall plane
-                    float planeNormX = ((isNormalFlipped ? wd.bp1 : wd.bp0) - inter).magnitude() / (wd.bp1 - wd.bp0).magnitude();
+                    float planeNormX = ((isNormalFlipped ? cdi->wallDataPtr->bp1 : cdi->wallDataPtr->bp0) - cdi->localInter).magnitude() / (cdi->wallDataPtr->bp1 - cdi->wallDataPtr->bp0).magnitude();
 
                     SDL_LockSurface(sdlSurface);
                     for(int h = startClip; h < totalHeight; h += iRowsInterval) {
@@ -362,7 +390,7 @@ namespace rp {
 
                         uint8_t wr, wg, wb, wa; // Wall color
                         decodeRGBA(
-                            (tex == nullptr) ? wd.tint : tex->getCoords(planeNormX, h / (float)totalHeight),
+                            (tex == nullptr) ? cdi->wallDataPtr->tint : tex->getCoords(planeNormX, h / (float)totalHeight),
                             wr, wg, wb, wa
                         );
 
@@ -406,8 +434,9 @@ namespace rp {
                     }
                     SDL_UnlockSurface(sdlSurface);
 
+                    delete cdi;
                     wasAnyHit = true;
-                    if(wd.stopsRay) {
+                    if(cdi->wallDataPtr->stopsRay) {
                         keepWalking = false;
                         break;
                     }
