@@ -32,6 +32,8 @@ namespace rp {
 
     DDA::DDA() {
         this->initialized = false;
+        this->maxTileDist = 0;
+        this->scene = nullptr;
     }
     DDA::DDA(const Scene* scene) : DDA() {
         setTargetScene(scene);
@@ -56,9 +58,11 @@ namespace rp {
             rayFlag = RF_FAIL;
             return;
         }
+        this->initialized = true;
+        this->originDone = false;
         this->start = start;
         this->direction = direction;
-        this->initialized = true;
+        this->rayFlag = RF_CLEAR;
 
         planePosX = (int)start.x;
         planePosY = (int)start.y;
@@ -82,38 +86,44 @@ namespace rp {
     }
     RayHitInfo DDA::next() {
         if(!initialized) {
-            rayFlag = DDA::RF_FAIL;
+            rayFlag = RF_FAIL;
             return RayHitInfo();
+        } else if(!originDone) {
+            // Include the starting tile in the ray walk
+            if(scene->getTileId(start.x, start.y) != 0)
+                rayFlag = RF_HIT;
+            originDone = true;
+            return RayHitInfo(0, Vector2((int)start.x, (int)start.y), start);
         }
         
         // Step along appropriate axis
         if(sideDistX < sideDistY) {
             sideDistX += deltaDistX;
             planePosX += stepX;
-            rayFlag = DDA::RF_SIDE;
+            rayFlag = RF_SIDE;
         } else {
             sideDistY += deltaDistY;
             planePosY += stepY;
-            rayFlag = DDA::RF_CLEAR;
+            rayFlag = RF_CLEAR;
         }
         // Check if hit tile is not exceeding the maximum tile distance
         int deltaPosX = planePosX - start.x;
         int deltaPosY = planePosY - start.y;
         if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > maxTileDist * maxTileDist) {
-            rayFlag = DDA::RF_TOO_FAR;
+            rayFlag = RF_TOO_FAR;
             return RayHitInfo();
         }
         // Check if hit tile is not outside the plane
         if(!scene->checkPosition(planePosX, planePosY)) {
-            rayFlag = DDA::RF_OUTSIDE;
+            rayFlag = RF_OUTSIDE;
             return RayHitInfo();
         }
 
         // If tile data is not zero, then ray hit this tile
         int tileData = scene->getTileId(planePosX, planePosY);
         if(tileData != 0) {
-            float distance = (rayFlag == DDA::RF_SIDE) ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
-            rayFlag |= DDA::RF_HIT;
+            float distance = (rayFlag == RF_SIDE) ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
+            rayFlag |= RF_HIT;
             return RayHitInfo(
                 distance,
                 Vector2(planePosX, planePosY),
@@ -121,7 +131,7 @@ namespace rp {
             );
         }
         // This should not trigger but it exists for safety reasons
-        rayFlag = DDA::RF_CLEAR;
+        rayFlag = RF_CLEAR;
         return RayHitInfo();
     }
     #ifdef DEBUG

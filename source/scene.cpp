@@ -38,20 +38,20 @@ namespace rp {
         bp0.x = (func.yMin - func.height) / func.slope;
         if(bp0.x < func.xMin) {
             bp0.x = func.xMin;
-            bp0.y = func.getValue(func.xMin);
+            bp0.y = func.slope * func.xMin + func.height;
         } else if(bp0.x > func.xMax) {
             bp0.x = func.xMax;
-            bp0.y = func.getValue(func.xMax);
+            bp0.y = func.slope * func.xMax + func.height;
         } else {
             bp0.y = func.yMin;
         }
         bp1.x = (func.yMax - func.height) / func.slope;
         if(bp1.x < func.xMin) {
             bp1.x = func.xMin;
-            bp1.y = func.getValue(func.xMin);
+            bp1.y = func.slope * func.xMin + func.height;
         } else if(bp1.x > func.xMax) {
             bp1.x = func.xMax;
-            bp1.y = func.getValue(func.xMax); 
+            bp1.y = func.slope * func.xMax + func.height;
         } else {
             bp1.y = func.yMax;
         }

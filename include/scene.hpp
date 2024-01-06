@@ -23,8 +23,8 @@ namespace rp {
     using ::std::string;
     using ::std::pair;
     using ::std::ifstream;
-    using ::std::stof;
     using ::std::abs;
+    using ::std::stof;
 
     /**
      * Defines a wall properties.

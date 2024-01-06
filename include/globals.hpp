@@ -8,6 +8,7 @@
 namespace rp {
     using ::std::istringstream;
     using ::std::string;
+    using ::std::abs;
     using ::std::noskipws;
 
     /**

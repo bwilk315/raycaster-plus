@@ -69,12 +69,8 @@ namespace rp {
             // This method is called when screen size changes, because pixels array must match the actual size
             void updateSurface();
 
-            // It is used once per ray to render walls of the tile in which it starts stepping
-            RayHitInfo simulateBoundaryEnter(const Vector2& pos, const Vector2& dir);
-
         public:
-            static const float MAX_LINE_SLOPE;
-
+            static const float SAFE_LINE_HEIGHT;
             enum {
                 E_CLEAR               = 0,
                 E_MAIN_CAMERA_NOT_SET = 1 << 1,

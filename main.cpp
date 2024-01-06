@@ -17,7 +17,7 @@ int main() {
     const float fovAngle = M_PI / 2;
     float turnSpeed = M_PI * 0.66f;
     Camera camera(Vector2(1.5f, 1.5f), M_PI/2-0.001f, fovAngle);
-    Engine engine(500, 1000);
+    Engine engine(1000, 1000);
     bool lockCursor = false;
 
     engine.setCursorLock(lockCursor);
@@ -26,8 +26,8 @@ int main() {
     engine.setLightBehavior(true, 0);
     engine.setMainCamera(&camera);
     engine.setRenderFitMode(RenderFitMode::STRETCH);
-    engine.setColumnsPerRay(1);
-    engine.setRowsInterval(1);
+    engine.setColumnsPerRay(4);
+    engine.setRowsInterval(4);
     engine.getWalker()->setTargetScene(&scene);
     engine.getWalker()->setMaxTileDistance(21);
     

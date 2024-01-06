@@ -7,34 +7,11 @@ namespace rp {
     /********** CLASS: ENGINE **********/
     /***********************************/
 
-    const float Engine::MAX_LINE_SLOPE = 1e4f;
+    const float Engine::SAFE_LINE_HEIGHT = 0.0001f;
 
     void Engine::updateSurface() {
         sdlSurface = SDL_GetWindowSurface(sdlWindow);
         pixels = (uint32_t*)sdlSurface->pixels;
-    }
-    RayHitInfo Engine::simulateBoundaryEnter(const Vector2& pos, const Vector2& dir) {
-        // Form a simulated hit structure and fake the ray flag value
-        RayHitInfo hit;
-        hit.tile = Vector2((int)pos.x, (int)pos.y);
-
-        // Position in the local tile space
-        float Xl = pos.x - hit.tile.x;
-        float Yl = pos.y - hit.tile.y;
-        // Potential values for both axes
-        float Xp = dir.x < 0;
-        float Yp = dir.y < 0;
-        // Actual values given the potential values
-        float Xa = (dir.x / dir.y) * (Yp - Yl) + Xl;
-        float Ya = (dir.y / dir.x) * (Xp - Xl) + Yl;
-        hit.point = Vector2(
-            // Chose this pair of coordinates which respects the tile boundaries
-            ( (Xa < 0 || Xa > 1) ? (Xp) : (Xa) ),
-            ( (Ya < 0 || Ya > 1) ? (Yp) : (Ya) ) + hit.tile.y
-        );
-        walker->rayFlag = DDA::RF_HIT | ( (hit.point.x == 0 || hit.point.x == 1) ? (DDA::RF_SIDE) : (0) );
-        hit.point.x += hit.tile.x;
-        return hit;
     }
     Engine::Engine(int screenWidth, int screenHeight) {
         this->bClear             = false;
@@ -253,9 +230,6 @@ namespace rp {
             bClear = false;
         }
         // Skip drawing process if redrawing is not requested
-
-        // WRONG STH WITH COLUMNS?!!?!?!!?
-
         int column = bRedraw ? rRenderArea.x : (rRenderArea.x + rRenderArea.w);
 
         // Draw the current frame, which consists of pixel columns
@@ -264,47 +238,47 @@ namespace rp {
             // Position of the ray on the camera plane, from -1 (left) to 1 (right)
             float cameraX = 2 * (column - rRenderArea.x) / (float)rRenderArea.w - 1;
             Vector2 rayDir = (camDir + planeVec * cameraX).normalized();
-            LinearFunc rayLine;  // Line equation describing the ray walk
-            // Ray slope stays constant for all hits
-            rayLine.slope = (rayDir.x == 0) ? (MAX_LINE_SLOPE) : (rayDir.y / rayDir.x);
 
             // Perform step-based DDA algorithm to find out which tiles get hit by the ray, find
             // the nearest wall of the nearest tile.
             walker->init(camPos, rayDir);
             bool keepWalking = true;
-            bool originDone = false; // Whether walls from the origin were examined
             bool wasAnyHit = false;
 
+            // #ifdef DEBUG
+            // if(column == iScreenWidth / 2) {
+            //    system("clear");
+            // }
+            // #endif
+            
             while(keepWalking) {
                 if(walker->rayFlag == DDA::RF_FAIL)
                     break;
 
-                RayHitInfo hit = originDone ? walker->next() : simulateBoundaryEnter(camPos, rayDir);
+                RayHitInfo hit = walker->next();
 
-                // If next tiles are unreachable, or nearest wall was found exit the loop
-                // (nwExists) ||
                 if((walker->rayFlag & DDA::RF_TOO_FAR) || (walker->rayFlag & DDA::RF_OUTSIDE))
                     break;
-                // If a ray touched an air tile (with data of 0), skip it
                 else if(!(walker->rayFlag & DDA::RF_HIT))
                     continue;
 
-                // Update the ray line intercept according to the ray hit point
-                float rayIntX;
-                float rayIntY;
+                // Compute the ray-tile intersection point, in local tile coordinates.
+                // If hit distance is exactly 0 it indicates hit occurred inside the origin tile.
+                Vector2 rayEnter;
+                float localX = hit.point.x - (int)hit.point.x;
+                float localY = hit.point.y - (int)hit.point.y;
                 if(walker->rayFlag & DDA::RF_SIDE) {
-                    rayIntY = hit.point.y - (int)hit.point.y;
-                    rayIntX = rayDir.x < 0;
+                    rayEnter.x = !hit.distance ? localX : (rayDir.x < 0);
+                    rayEnter.y = localY;
                 } else {
-                    rayIntX = hit.point.x - (int)hit.point.x;
-                    rayIntY = rayDir.y < 0;
+                    rayEnter.x = localX;
+                    rayEnter.y = !hit.distance ? localY : (rayDir.y < 0);
                 }
-                rayLine.height = rayIntY - rayLine.slope * rayIntX;
 
-                // Find the nearest wall in the obtained non-air tile
+                // Sort walls by their distance to the camera plane in ascending order (not done yet)
+
                 int tileData = mainScene->getTileId(hit.tile.x, hit.tile.y);
 
-                // IT WORKS BUT ... THIS HAVE TO BE CHANGED IN THE FUTURE FOR KNOWN REASONS ...
                 // Compute additional information of the walls, store them in a map that will sort them by distance
                 vector<WallData> details = mainScene->getTileWalls(tileData);
 
@@ -313,17 +287,34 @@ namespace rp {
                 int reps = 0; // Wall line repetitions
                 for(int i = 0; i < details.size(); i++) {
                     WallData* wdp = &details.at(i);
-                    // Find intersection point of line defining current wall geometry and the ray line
-                    Vector2 inter = wdp->func.getCommonPoint(rayLine);
-                    if((inter.x < 0 || inter.x > 1 || inter.y < 0 || inter.y > 1) ||
-                       (inter.x < wdp->func.xMin || inter.x > wdp->func.xMax) ||
+
+                    // COMPUTATION WITHOUT USING SQUARE ROOT (can be simplified further)
+                    // The formula below was derived by parts, and compressed into one long computation
+                    // NOTE: this formula works even when enter point is actually inside a tile
+                    float a = wdp->func.slope;
+                    float h = wdp->func.height;
+                    float interDist = ( rayEnter.y - a * rayEnter.x - ( h == 0 ? SAFE_LINE_HEIGHT : h ) ) / ( rayDir.x * a - rayDir.y );
+                    
+                    // #ifdef DEBUG
+                    // if(column == iScreenWidth / 2) {
+                    //     cout << interDist << endl;
+                    // }
+                    // #endif
+
+                    // Distance is negative when a wall is not reached by the ray, this and the fact that the longest
+                    // distance in tile boundary is 1/sqrt(2), can be used to perform early classification.
+                    if(interDist < 0 || interDist > INV_SQRT2)
+                        continue;
+
+                    Vector2 inter = interDist * rayDir + rayEnter;
+
+                    // Check if point is included in arguments and values range, if not skip it
+                    if((inter.x < wdp->func.xMin || inter.x > wdp->func.xMax) ||
                        (inter.y < wdp->func.yMin || inter.y > wdp->func.yMax)) {
-                        // Intersection point is out of tile or domain bounds, skip it then
                         continue;
                     }
-                    // Perpendicular distance from wall intersection point (global) to the camera plane
-                    float planeDist = planeLine.getDistanceFromPoint(hit.tile + inter);
-                    planeDist = (int)(planeDist * 10000) / 10000.0f; // simple rounding
+
+                    float planeDist = rayDir.dot(camDir) * ( hit.distance + interDist );
 
                     // Plane distance must be unique, because it is a key of map
                     if(additional.count(planeDist) != 0)
@@ -342,7 +333,8 @@ namespace rp {
                     // Find normal vector that always points out of the wall plane
                     bool isNormalFlipped = false;
                     float normAngle = (wd.func.slope == 0) ? (-1 * M_PI_2) : (atanf(1 / wd.func.slope * -1));
-                    float globalPosInterY = wd.func.getValue(camPos.x - hit.tile.x) + hit.tile.y;
+                    float val = wd.func.slope * (camPos.x - hit.tile.x) + wd.func.height;
+                    float globalPosInterY = val + hit.tile.y;
                     Vector2 normal = (Vector2::RIGHT).rotate(normAngle);
                     if( (wd.func.slope >= 0 && camPos.y > globalPosInterY) || // If camera is above the line or below
                         (wd.func.slope  < 0 && camPos.y < globalPosInterY)) { // it, normal needs to be flipped.
@@ -350,11 +342,6 @@ namespace rp {
                         isNormalFlipped = true;
                     }
 
-                    // Prevent drawing things that are behind the camera, it is caused by finding intersections in the
-                    // origin tile, there are always two but only one is in front of the camera (detected using dot product).
-                    if(!originDone && rayDir.dot(normal) > 0)
-                        continue;
-                    
                     // Find out range describing how column should be drawn for the current wall
                     int lineHeight  = rRenderArea.h * (pcmDist / planeDist);
                     int drawStart   = (rRenderArea.h + lineHeight) / 2 - lineHeight * wd.hMin;
@@ -425,8 +412,6 @@ namespace rp {
                         break;
                     }
                 }
-                
-                originDone = true;
             }
             if(!wasAnyHit)
                 continue; // Ray ended his walk and hit nothing, skip the iteration
