@@ -37,7 +37,6 @@ namespace rp {
         return hit;
     }
     Engine::Engine(int screenWidth, int screenHeight) {
-        this->bAllowWindowResize = false;
         this->bClear             = false;
         this->bIsCursorLocked    = false;
         this->bLightEnabled      = false;
@@ -55,9 +54,7 @@ namespace rp {
         this->vLightDir          = Vector2::RIGHT;
         this->tpLast             = system_clock::now();
         this->elapsedTime        = duration<float>(0);
-        this->rClearArea         = {};
         this->rRenderArea        = {};
-        this->rRedrawArea        = {};
         this->keyStates          = map<int, KeyState>();
 
         if(SDL_InitSubSystem(SDL_INIT_VIDEO) == 0) {
@@ -67,7 +64,7 @@ namespace rp {
             this->sdlSurface = nullptr;
             this->sdlWindow  = SDL_CreateWindow("Raycaster Plus Engine", 0, 0, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
             if(sdlWindow != nullptr) {
-                SDL_SetWindowResizable(this->sdlWindow, SDL_TRUE);
+                SDL_SetWindowResizable(this->sdlWindow, SDL_FALSE);
                 updateSurface();
                 return;
             }
@@ -88,17 +85,6 @@ namespace rp {
     }
     void Engine::clear() {
         bClear = true;
-        rClearArea.x = 0;
-        rClearArea.y = 0;
-        rClearArea.w = rRenderArea.w;
-        rClearArea.h = rRenderArea.h;
-    }
-    void Engine::clear(const SDL_Rect& rect) {
-        bClear = true;
-        rClearArea.x = rect.x;
-        rClearArea.y = rect.y;
-        rClearArea.w = clamp(rect.w, 0, rRenderArea.w - rect.x);
-        rClearArea.h = clamp(rect.h, 0, rRenderArea.h - rect.y);
     }
     void Engine::stop() {
         bRun = false;
@@ -163,27 +149,8 @@ namespace rp {
                 break;
         }
     }
-    void Engine::setWindowResize(bool enabled) {
-        if(sdlWindow == nullptr) {
-            iError |= E_WRONG_CALL_ORDER;
-            return;
-        }
-        bAllowWindowResize = enabled;
-        SDL_SetWindowResizable(sdlWindow, (SDL_bool)enabled);
-    }
     void Engine::render() {
         bRedraw = true;
-        rRedrawArea.x = 0;
-        rRedrawArea.y = 0;
-        rRedrawArea.w = rRenderArea.w;
-        rRedrawArea.h = rRenderArea.h;
-    }
-    void Engine::render(const SDL_Rect& rect) {
-        bRedraw = true;
-        rRedrawArea.x = rect.x;
-        rRedrawArea.y = rect.y;
-        rRedrawArea.w = clamp(rect.w, 0, rRenderArea.w - rect.x);
-        rRedrawArea.h = clamp(rect.h, 0, rRenderArea.h - rect.y);
     }
     int Engine::getError() const {
         return iError;
@@ -256,15 +223,6 @@ namespace rp {
                     if(keyStates.count(sc) != 0)
                         keyStates.at(sc) = KeyState::UP;
                     break;
-                case SDL_WINDOWEVENT:
-                    // It sometimes fails "double free or corruption" (probably related to freeing the old surface)
-                    if(event.window.event == SDL_WINDOWEVENT_RESIZED) {
-                        SDL_GetWindowSize(sdlWindow, &iScreenWidth, &iScreenHeight);
-                        // Refresh the fit mode and the surface to let them adapt to a new resolution
-                        setRenderFitMode(renderFitMode);
-                        updateSurface();
-                    } 
-                    break;
             }
         }
 
@@ -274,7 +232,6 @@ namespace rp {
         /********************************************/
         /********************************************/
 
-        const int redrawEnd = rRedrawArea.x + rRedrawArea.w;
         // Perspective-correct minimum distance; if you stand this distance from the cube looking at it orthogonally,
         // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
         // located at height of 1/2.
@@ -291,18 +248,21 @@ namespace rp {
         // Clear the entire screen buffer if requested
         if(bClear) {
             SDL_LockSurface(sdlSurface);
-            SDL_FillRect(sdlSurface, &rClearArea, 0);
+            SDL_FillRect(sdlSurface, NULL, 0);
             SDL_UnlockSurface(sdlSurface);
             bClear = false;
         }
         // Skip drawing process if redrawing is not requested
-        int column = bRedraw ? rRedrawArea.x : redrawEnd;
+
+        // WRONG STH WITH COLUMNS?!!?!?!!?
+
+        int column = bRedraw ? rRenderArea.x : (rRenderArea.x + rRenderArea.w);
 
         // Draw the current frame, which consists of pixel columns
-        for( ; column < redrawEnd; column += iColumnsPerRay) {
+        for( ; column < (rRenderArea.x + rRenderArea.w); column += iColumnsPerRay) {
 
             // Position of the ray on the camera plane, from -1 (left) to 1 (right)
-            float cameraX = 2 * column / (float)rRenderArea.w - 1;
+            float cameraX = 2 * (column - rRenderArea.x) / (float)rRenderArea.w - 1;
             Vector2 rayDir = (camDir + planeVec * cameraX).normalized();
             LinearFunc rayLine;  // Line equation describing the ray walk
             // Ray slope stays constant for all hits
@@ -412,9 +372,6 @@ namespace rp {
                         int currHeight = drawStart - h;
                         if(currHeight < 0) // Rows interval may lead to this being real
                             break;
-                        // Maybe not perfect but reasonable and readable
-                        else if(currHeight < rRedrawArea.y || currHeight > rRedrawArea.y + rRedrawArea.h)
-                            continue;
 
                         uint8_t wr, wg, wb, wa; // Wall color
                         decodeRGBA(
@@ -424,7 +381,7 @@ namespace rp {
 
                         if(wa != 0) {
                             // column does not need to be shifted by `rRedrawArea.x` because it is already
-                            int currIndex = (column + rRenderArea.x) + (currHeight + rRenderArea.y) * sdlSurface->w;
+                            int currIndex = column + (currHeight + rRenderArea.y) * sdlSurface->w;
                             uint8_t cr, cg, cb, ca; // Current color
                             decodeRGBA(pixels[currIndex], cr, cg, cb, ca);
 

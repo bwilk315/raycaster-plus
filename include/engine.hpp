@@ -40,7 +40,6 @@ namespace rp {
 
     class Engine {
         private:
-            bool bAllowWindowResize;
             bool bClear;
             bool bIsCursorLocked;
             bool bLightEnabled;
@@ -58,9 +57,7 @@ namespace rp {
             Vector2                  vLightDir;
             time_point<system_clock> tpLast;
             duration<float>          elapsedTime;
-            SDL_Rect                 rClearArea;
             SDL_Rect                 rRenderArea;
-            SDL_Rect                 rRedrawArea;
             map<int, KeyState>       keyStates; // SDL Scancode -> State of that key
 
             uint32_t*     pixels; // Array of window surface pixels
@@ -90,10 +87,6 @@ namespace rp {
 
             /* Makes all pixels of the render area black once per frame */
             void clear();
-
-            /* Makes all pixels of the render area included in `rect` area black once, meaning that another
-               call to this method alters the previous one's setting. */
-            void clear(const SDL_Rect& rect);
 
             /* Returns an overall error code that in binary form represents whether some error occurred (1) or not (0),
                see `E_<error_name>` constants for more details about individual errors. */ 
@@ -127,11 +120,7 @@ namespace rp {
 
             /* Allows for drawing process on the entire render area once per frame */
             void render();
-
-            /* Allows for drawing process on the render area included in `rect` area once, meaning that another
-               call to this method changes the previous one's setting. */
-            void render(const SDL_Rect& rect);
-
+            
             /* Frees allocated memory, then sets the stop flag which makes `tick` method unavailable */
             void stop();
 
@@ -162,9 +151,6 @@ namespace rp {
 
             /* Makes one column pixel provide data for next `n` of them, so there will be total of `columnHeight / n` pixels */
             void setRowsInterval(int n);
-
-            /* The `enabled` flag specifies if window resizability should be turned on/off */
-            void setWindowResize(bool enabled);
 
             /* Function responsible for handling user input and drawing the render area. You should call it as often
                as possible to make the engine the most responsive, you do not need to delay it by hand in order to save

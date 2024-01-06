@@ -17,7 +17,7 @@ int main() {
     const float fovAngle = M_PI / 2;
     float turnSpeed = M_PI * 0.66f;
     Camera camera(Vector2(1.5f, 1.5f), M_PI/2-0.001f, fovAngle);
-    Engine engine(1000, 1000);
+    Engine engine(500, 1000);
     bool lockCursor = false;
 
     engine.setCursorLock(lockCursor);
@@ -25,10 +25,9 @@ int main() {
     engine.setFrameRate(60);
     engine.setLightBehavior(true, 0);
     engine.setMainCamera(&camera);
-    engine.setWindowResize(true);
-    engine.setRenderFitMode(RenderFitMode::SQUARE);
-    engine.setColumnsPerRay(4);
-    engine.setRowsInterval(4);
+    engine.setRenderFitMode(RenderFitMode::STRETCH);
+    engine.setColumnsPerRay(1);
+    engine.setRowsInterval(1);
     engine.getWalker()->setTargetScene(&scene);
     engine.getWalker()->setMaxTileDistance(21);
     
@@ -43,26 +42,10 @@ int main() {
             int frame = engine.getFrameCount();
             SDL_Rect r = engine.getRenderArea();
 
-            if(frame % 1 == 0) {
-                engine.clear({ 500-150, 500-150, 300, 300 });
-                engine.render({ 500-150, 500-150, 300, 300 });
-            }
-            if(frame % 2 == 0) {
-                engine.clear({ 500-250, 500-250, 500, 500 });
-                engine.render({ 500-250, 500-250, 500, 500 });
-            }
-            if(frame % 4 == 0) {
-                engine.clear({ 500-350, 500-350, 700, 700 });
-                engine.render({ 500-350, 500-350, 700, 700 });
-            }
-            if(frame % 6 == 0) {
-                engine.clear({ 500-450, 500-450, 900, 900 });
-                engine.render({ 500-450, 500-450, 900, 900 });
-            }
-            if(frame % 8 == 0) {
-                engine.clear();
-                engine.render();
-            }
+            engine.clear();
+            engine.render();
+            // engine.clear();
+            // engine.render();
 
             isFreezed = false;
             isTransforming = false;

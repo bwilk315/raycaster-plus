@@ -272,34 +272,32 @@ namespace rp {
                     string textureFile = text.substr(1, tLen - 2); // Without double apostrophes
                     int assignedId = loadTexture(textureFile);
 
-                    if(assignedId != 0) {
-                        setTileWall(
-                            (int)stof(args.at(1)),
-                            -1, // Enforce new wall entry creation (to not override existing ones)
-                            WallData(
-                                LinearFunc(
-                                    stof(args.at(3)),
-                                    stof(args.at(4)),
-                                    stof(args.at(6)),
-                                    stof(args.at(7)),
-                                    stof(args.at(8)),
-                                    stof(args.at(9))
-                                ),
-                                encodeRGBA(
-                                    // Add 1 to prevent the color from being pure black, because engine uses this color
-                                    // in pixel-occupation status purposes.
-                                    (uint8_t)clamp((int)stof(args.at(15)), MIN_CHANNEL, 255),
-                                    (uint8_t)clamp((int)stof(args.at(16)), MIN_CHANNEL, 255),
-                                    (uint8_t)clamp((int)stof(args.at(17)), MIN_CHANNEL, 255),
-                                    (uint8_t)stof(args.at(18))
-                                ),
-                                stof(args.at(10)),
-                                stof(args.at(11)),
-                                assignedId,
-                                (bool)stof(args.at(13))
-                            )
-                        );
-                    }
+                    setTileWall(
+                        (int)stof(args.at(1)),
+                        -1, // Enforce new wall entry creation (to not override existing ones)
+                        WallData(
+                            LinearFunc(
+                                stof(args.at(3)),
+                                stof(args.at(4)),
+                                stof(args.at(6)),
+                                stof(args.at(7)),
+                                stof(args.at(8)),
+                                stof(args.at(9))
+                            ),
+                            encodeRGBA(
+                                // Add 1 to prevent the color from being pure black, because engine uses this color
+                                // in pixel-occupation status purposes.
+                                (uint8_t)clamp((int)stof(args.at(15)), MIN_CHANNEL, 255),
+                                (uint8_t)clamp((int)stof(args.at(16)), MIN_CHANNEL, 255),
+                                (uint8_t)clamp((int)stof(args.at(17)), MIN_CHANNEL, 255),
+                                (uint8_t)stof(args.at(18))
+                            ),
+                            stof(args.at(10)),
+                            stof(args.at(11)),
+                            assignedId,
+                            (bool)stof(args.at(13))
+                        )
+                    );
                     break;
                 }
                 default: {
