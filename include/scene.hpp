@@ -28,12 +28,13 @@ namespace rp {
 
     /**
      * Defines a wall properties.
-     * You should call `updateBoundaryPoints` after changing `func` member, it ensures that
-     * boundary points `bp0` and `bp1` are up to date.
+     * You should call `updateMetrics` after changing `func` member, it ensures that variables responsible for
+     * proper wall texturing (`pivot` and `length`) are up to date.
      */
     struct WallData {
         LinearFunc func;  // Function describing top-down look of the wall
-        Vector2 bp0, bp1; // Intersection points of tile boundary and the function
+        Vector2 pivot;    // Point located in the left half of a tile, indicates the wall beginning
+        float length;     // Length of a wall
         float hMin, hMax; // Range of wall height to draw
         uint32_t tint;    // Tint color of the wall surface
         uint16_t texId;   // ID number of texture to use (0 indicates no texture)
@@ -41,8 +42,8 @@ namespace rp {
 
         WallData();
         WallData(const LinearFunc& func, const uint32_t& tint, float hMin, float hMax, uint16_t texId, bool stopsRay);
-        
-        void updateBoundaryPoints();
+
+        void updateMetrics();
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const WallData& wd);

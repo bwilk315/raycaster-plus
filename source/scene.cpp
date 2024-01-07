@@ -9,11 +9,11 @@ namespace rp {
 
     WallData::WallData() {
         this->func = LinearFunc();
-        this->tint = 0;
-        this->bp0 = Vector2::ZERO;
-        this->bp1 = Vector2::ZERO;
+        this->pivot = Vector2::ZERO;
+        this->length = 0;
         this->hMin = 0;
         this->hMax = 1;
+        this->tint = 0;
         this->texId = 0;
         this->stopsRay = true;
     }
@@ -24,43 +24,39 @@ namespace rp {
         this->hMax = hMax;
         this->texId = texId;
         this->stopsRay = stopsRay;
-        updateBoundaryPoints();
+        updateMetrics();
     }
-    void WallData::updateBoundaryPoints() {
-        if(func.slope == 0) {
-            bp0.x = func.xMin;
-            bp0.y = func.height;
-            bp1.x = func.xMax;
-            bp1.y = func.height;
-            return;
-        }
-        // Very similar blocks, do not they?
-        bp0.x = (func.yMin - func.height) / func.slope;
-        if(bp0.x < func.xMin) {
-            bp0.x = func.xMin;
-            bp0.y = func.slope * func.xMin + func.height;
-        } else if(bp0.x > func.xMax) {
-            bp0.x = func.xMax;
-            bp0.y = func.slope * func.xMax + func.height;
+    void WallData::updateMetrics() {
+        pivot.y = func.slope * func.xMin + func.height;
+        if(pivot.y < func.yMin) {
+            pivot.x = (func.yMin - func.height) / func.slope;
+            pivot.y = func.yMin;
+        } else if(pivot.y > func.yMax) {
+            pivot.x = (func.yMax - func.height) / func.slope;
+            pivot.y = func.yMax;
         } else {
-            bp0.y = func.yMin;
+            pivot.x = func.xMin;
         }
-        bp1.x = (func.yMax - func.height) / func.slope;
-        if(bp1.x < func.xMin) {
-            bp1.x = func.xMin;
-            bp1.y = func.slope * func.xMin + func.height;
-        } else if(bp1.x > func.xMax) {
-            bp1.x = func.xMax;
-            bp1.y = func.slope * func.xMax + func.height;
+
+        Vector2 end;
+        end.y = func.slope * func.xMax + func.height;
+        if(end.y < func.yMin) {
+            end.x = (func.yMin - func.height) / func.slope;
+            end.y = func.yMin;
+        } else if(end.y > func.yMax) {
+            end.x = (func.yMax - func.height) / func.slope;
+            end.y = func.yMax;
         } else {
-            bp1.y = func.yMax;
+            end.x = func.xMax;
         }
+
+        length = (end - pivot).magnitude();
     }
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const WallData& wd) {
-        stream << "WallData(func=" << wd.func << ", tint=" << wd.tint << ", bp0=" << wd.bp0;
-        stream << ", bp1=" << wd.bp1 << ", hMin=" << wd.hMin << ", hMax=" << wd.hMax << ", texId=";
-        stream << wd.texId << ", stopsRay=" << wd.stopsRay << ")";
+        stream << "WallData(func=" << wd.func << ", pivot=" << wd.pivot << ", length=" << wd.length;
+        stream << ", hMin=" << wd.hMin << ", hMax=" << wd.hMax << ", texId=" << wd.texId << ", stopsRay=";
+        stream << wd.stopsRay << ")";
         return stream;
     }
     #endif

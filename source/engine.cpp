@@ -234,7 +234,7 @@ namespace rp {
         // Perspective-correct minimum distance; if you stand this distance from the cube looking at it orthogonally,
         // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
         // located at height of 1/2.
-        const float pcmDist = 1 / (2 * tanf(mainCamera->getFieldOfView() / 2));
+        const float pcmDist = 1 / (2 * tan(mainCamera->getFieldOfView() / 2));
         const Scene* const mainScene = walker->getTargetScene();
         Vector2 camDir = mainCamera->getDirection();
         Vector2 camPos = mainCamera->getPosition();
@@ -247,7 +247,7 @@ namespace rp {
         // Clear the entire screen buffer if requested
         if(bClear) {
             SDL_LockSurface(sdlSurface);
-            SDL_FillRect(sdlSurface, NULL, 0);
+            memset(pixels, 0, sdlSurface->pitch * sdlSurface->h);
             SDL_UnlockSurface(sdlSurface);
             bClear = false;
         }
@@ -265,13 +265,12 @@ namespace rp {
             // the nearest wall of the nearest tile.
             walker->init(camPos, rayDir);
             bool keepWalking = true;
-            bool wasAnyHit = false;
 
-            // #ifdef DEBUG
-            // if(column == iScreenWidth / 2) {
-            //    system("clear");
-            // }
-            // #endif
+            #ifdef DEBUG
+            if(column == iScreenWidth / 2) {
+               system("clear");
+            }
+            #endif
             
             while(keepWalking) {
                 if(walker->rayFlag == DDA::RF_FAIL)
@@ -358,16 +357,15 @@ namespace rp {
                 for(int i = 0; i != dipLen; i++) {
                     ColumnDrawInfo* cdi = drawInfoPtrs[i];
 
-                    // Find normal vector that always points out of the wall plane
-                    bool isNormalFlipped = false;
-                    float normAngle = (cdi->wallDataPtr->func.slope == 0) ? (-1 * M_PI_2) : (atanf(1 / cdi->wallDataPtr->func.slope * -1));
-                    float val = cdi->wallDataPtr->func.slope * (camPos.x - hit.tile.x) + cdi->wallDataPtr->func.height;
-                    float globalPosInterY = val + hit.tile.y;
-                    Vector2 normal = (Vector2::RIGHT).rotate(normAngle);
-                    if( (cdi->wallDataPtr->func.slope >= 0 && camPos.y > globalPosInterY) || // If camera is above the line or below
-                        (cdi->wallDataPtr->func.slope  < 0 && camPos.y < globalPosInterY)) { // it, normal needs to be flipped.
-                        normal = normal * -1;
-                        isNormalFlipped = true;
+                    // Calculate a normal vector of the wall, it always points outwards it
+                    bool flipped = false;
+                    float a = cdi->wallDataPtr->func.slope;
+                    float h = cdi->wallDataPtr->func.height;
+                    float coef = 1 / sqrt( a * a + 1 );
+                    Vector2 normal(a * coef, -1 * coef);
+                    if(camPos.y >= a * (camPos.x - hit.tile.x) + hit.tile.y + h) {
+                        normal *= -1;
+                        flipped = true;
                     }
 
                     // Find out range describing how column should be drawn for the current wall
@@ -377,73 +375,29 @@ namespace rp {
                     int startClip   = drawStart > rRenderArea.h ? (drawStart - rRenderArea.h) : 0;
                     int totalHeight = drawStart - drawEnd;
 
-                    const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
-                    int texHeight = tex == nullptr ? 1 : tex->getHeight();
-                    // Compute normalized horizontal position on the wall plane
-                    float planeNormX = ((isNormalFlipped ? cdi->wallDataPtr->bp1 : cdi->wallDataPtr->bp0) - cdi->localInter).magnitude() / (cdi->wallDataPtr->bp1 - cdi->wallDataPtr->bp0).magnitude();
-
                     SDL_LockSurface(sdlSurface);
-                    for(int h = startClip; h < totalHeight; h += iRowsInterval) {
-                        int currHeight = drawStart - h;
-                        if(currHeight < 0) // Rows interval may lead to this being real
-                            break;
+                    const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
+                    if(tex == nullptr) {
+                        // draw solid-color wall
+                        
+                    } else {
+                        // draw textured wall
 
-                        uint8_t wr, wg, wb, wa; // Wall color
-                        decodeRGBA(
-                            (tex == nullptr) ? cdi->wallDataPtr->tint : tex->getCoords(planeNormX, h / (float)totalHeight),
-                            wr, wg, wb, wa
-                        );
-
-                        if(wa != 0) {
-                            // column does not need to be shifted by `rRedrawArea.x` because it is already
-                            int currIndex = column + (currHeight + rRenderArea.y) * sdlSurface->w;
-                            uint8_t cr, cg, cb, ca; // Current color
-                            decodeRGBA(pixels[currIndex], cr, cg, cb, ca);
-
-                            // Set screen buffer pixel if it is not already (meaning it is pure black),
-                            // This trick is only possible because texture loader is made to alter black to not be so pure.
-                            if(cr + cg + cb < MIN_CHANNEL) {
-
-                                // Apply shading if light source is enabled
-                                if(bLightEnabled) {
-                                    const float minBn = 0.2f;
-                                    float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
-                                    float bn = minBn + (1 - minBn) * perc; // Final brightness
-                                    wr *= bn;
-                                    wg *= bn;
-                                    wb *= bn;
-                                }
-
-                                for(int i = 0; i < iColumnsPerRay; i++) {
-                                    if(column + i == rRenderArea.h)
-                                        break;
-                                    for(int j = 0; j < iRowsInterval; j++) {
-                                        if(currHeight - j == -1)
-                                            break;
-                                        // Use SDL-provided function for converting RGBA color in appropriate way to a single number
-                                        pixels[currIndex + i - j * sdlSurface->w] = SDL_MapRGB(
-                                            sdlSurface->format,
-                                            clamp(wr, MIN_CHANNEL, 255),
-                                            clamp(wg, MIN_CHANNEL, 255),
-                                            clamp(wb, MIN_CHANNEL, 255)
-                                        );
-                                    }
-                                }
-                            }
-                        }
+                        int texHeight = tex->getHeight();
+                        // Compute normalized horizontal position on the wall plane
+                        float planeNormX = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
+                        if(flipped)
+                            planeNormX = 1 - planeNormX;
                     }
                     SDL_UnlockSurface(sdlSurface);
 
                     delete cdi;
-                    wasAnyHit = true;
                     if(cdi->wallDataPtr->stopsRay) {
                         keepWalking = false;
                         break;
                     }
                 }
             }
-            if(!wasAnyHit)
-                continue; // Ray ended his walk and hit nothing, skip the iteration
 
             #ifdef DEBUG
             if(abs(column - iScreenWidth / 2) <= iColumnsPerRay) {

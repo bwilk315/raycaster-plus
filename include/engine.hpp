@@ -7,6 +7,7 @@
 #endif
 #include <map>
 #include <chrono>
+#include <cmath>
 #include <SDL2/SDL.h>
 #include "camera.hpp"
 #include "dda.hpp"
@@ -26,6 +27,8 @@ namespace rp {
     using ::std::chrono::duration;
     using ::std::pair;
     using ::std::map;
+    using ::std::sqrt;
+    using ::std::tan;
 
     enum KeyState {
         NONE,  // Nothing happens
@@ -50,7 +53,6 @@ namespace rp {
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const ColumnDrawInfo& cdi);
     #endif
-
 
     class Engine {
         private:
