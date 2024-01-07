@@ -4,7 +4,39 @@
 
 using namespace rp;
 
+void insert_sorted(vector<int>& vec, int value) {
+    int size = vec.empty() ? 0 : vec.size();
+    if(size == 0) {
+        vec.push_back(value);
+        return;
+    }
+    bool gotIt = false;
+    for(int e = 0; e < size; e++) {
+        if(value >= vec.at(e)) {
+            vec.insert(vec.begin() + e, value);
+            gotIt = true;
+            break;
+        }
+    }
+    if(!gotIt)
+        vec.push_back(value);
+}
+
 int main() {
+
+    // vector<int> arr;
+
+    // insert_sorted(arr, 22324);
+    // insert_sorted(arr, 22);
+    // insert_sorted(arr, 223);
+    // insert_sorted(arr, 543);
+
+    // for(const int& element : arr) {
+    //     std::cout << element << std::endl;
+    // }
+
+    // return 0;
+
     Scene scene;
     int line = scene.loadFromFile("resources/my_world.rps");
     std::cout << "Loading plane error " << scene.getError() << " at line " << line << std::endl;

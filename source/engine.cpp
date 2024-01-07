@@ -272,6 +272,9 @@ namespace rp {
             }
             #endif
             
+            // Occupied Height Ranges vector, used for determining if pixels can be drawn
+            vector<pair<int, int>> exclRanges;
+
             while(keepWalking) {
                 if(walker->rayFlag == DDA::RF_FAIL)
                     break;
@@ -352,7 +355,6 @@ namespace rp {
                     }
                 }
 
-                // THIS NEEDS TO BE REMADE, IT CANT BE THAT DRAWING IS DONE BY CHECKING EVERY PIXEL
                 // First walls are valid pointers, nullptrs are left far away
                 for(int i = 0; i != dipLen; i++) {
                     ColumnDrawInfo* cdi = drawInfoPtrs[i];
@@ -370,25 +372,110 @@ namespace rp {
 
                     // Find out range describing how column should be drawn for the current wall
                     int lineHeight  = rRenderArea.h * (pcmDist / cdi->perpDist);
-                    int drawStart   = (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
-                    int drawEnd     = (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
-                    int startClip   = drawStart > rRenderArea.h ? (drawStart - rRenderArea.h) : 0;
+                    int drawStart   = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
+                    int drawEnd     = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
+                    int startClip   = drawStart > rRenderArea.y + rRenderArea.h ? (drawStart - rRenderArea.y - rRenderArea.h) : 0;
                     int totalHeight = drawStart - drawEnd;
 
                     SDL_LockSurface(sdlSurface);
-                    const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
-                    if(tex == nullptr) {
-                        // draw solid-color wall
-                        
-                    } else {
-                        // draw textured wall
 
-                        int texHeight = tex->getHeight();
-                        // Compute normalized horizontal position on the wall plane
-                        float planeNormX = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
-                        if(flipped)
-                            planeNormX = 1 - planeNormX;
+                    const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
+                    bool isSolidColor = tex == nullptr;
+
+                    int texHeight = isSolidColor ? 1 : tex->getHeight();
+                    // Compute normalized horizontal position on the wall plane
+                    float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
+                    if(flipped)
+                        planeHorizontal = 1 - planeHorizontal;
+
+                    // Draw column using drawable information
+                    int dbStart = drawStart - startClip;
+                    int dbEnd = drawEnd < rRenderArea.y ? rRenderArea.y : drawEnd;
+                    int exclCount = exclRanges.empty() ? 0 : exclRanges.size();
+                    int exclStart = -1; // Next exclusion range start Y coordinate
+                    
+                    // THIS IS NOT WORKING PROPERLY, IT IS MESSED UP ...
+                    for(int h = dbStart; h > dbEnd; h -= iRowsInterval) {
+
+                        // Check for falling into exclusion range
+                        if(exclStart == -1 || h == exclStart) {
+                            
+                            // Find the nearest exclusion range above the current coordinate
+                            bool setHeight = false;
+                            for(int e = 0; e < exclCount; e++) {
+                                const pair<int, int>& range = exclRanges.at(e);
+
+                                // Find out if height should not jump over the exclusion range
+                                if(h <= range.first && h > range.second) {
+                                    h = range.second; // Move out from the range
+                                    setHeight = true;
+
+                                    if(e == exclCount - 1) {
+                                        exclStart = 0;
+                                    } else {
+                                        exclStart = exclRanges.at(e + 1).first;
+                                    }
+                                    break;
+                                }
+                            }
+                            if(setHeight)
+                                continue;
+                            else if(h < 0)
+                                break;
+                        }
+
+                        // Obtain a current pixel color
+                        uint8_t r, g, b, a;
+                        uint32_t color;
+                        if(isSolidColor) {
+                            decodeRGBA(cdi->wallDataPtr->tint, r, g, b, a);
+                        } else {
+                            float planeVertical = (drawStart - h) / (float)totalHeight;
+                            decodeRGBA(tex->getCoords(planeHorizontal, planeVertical), r, g, b, a);
+                        }
+
+                        // Apply lightning to the color
+                        if(bLightEnabled) {
+                            const float minBn = 0.2f;
+                            float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
+                            float bn = minBn + (1 - minBn) * perc; // Final brightness
+                            r *= bn;
+                            g *= bn;
+                            b *= bn;
+                        }
+
+                        // Draw pixel to the buffer
+                        color = SDL_MapRGB(sdlSurface->format, r, g, b);
+                        for(int c = 0; c != iColumnsPerRay; c++)
+                            for(int r = 0; r != iRowsInterval; r++)
+                                pixels[c + column + (h + r) * sdlSurface->h] = color;
+
                     }
+
+                    // IT IS NEEDED TO SOMEHOW INSERT NEW EXCLUSION RANGE AND REMAIN IT SORTED, BUT IT LITERALLY
+                    // DUPLICATES, FOR NOW I DONT KNOW WHAT IS GOING ON (NEEDS REFACTOR FOR BETTER REDABILITY)
+                    auto newRange = pair<int, int>(dbStart, dbEnd);
+                    if(exclCount == 0) {
+                        exclRanges.push_back(newRange);
+                    } else {
+                        bool gotIt = false;
+                        for(int e = 0; e < exclCount; e++) {
+                            if(newRange.first >= exclRanges.at(e).first) {
+                                exclRanges.insert(exclRanges.begin() + e, newRange);
+                                gotIt = true;
+                                break;
+                            }
+                            #ifdef DEBUG
+                            if(column == iScreenWidth / 2) {
+                                cout << e << ": From " << exclRanges.at(e).first << " to " << exclRanges.at(e).second << endl;
+                            }
+                            #endif
+                        }
+                        if(!gotIt)
+                            exclRanges.push_back(newRange);
+                    }
+
+
                     SDL_UnlockSurface(sdlSurface);
 
                     delete cdi;
@@ -396,7 +483,9 @@ namespace rp {
                         keepWalking = false;
                         break;
                     }
+
                 }
+
             }
 
             #ifdef DEBUG

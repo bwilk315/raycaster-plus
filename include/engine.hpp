@@ -5,9 +5,9 @@
 #ifdef DEBUG
 #include <iostream>
 #endif
-#include <map>
 #include <chrono>
 #include <cmath>
+#include <map>
 #include <SDL2/SDL.h>
 #include "camera.hpp"
 #include "dda.hpp"
