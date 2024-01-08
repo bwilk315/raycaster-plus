@@ -392,36 +392,54 @@ namespace rp {
                     int dbStart = drawStart - startClip;
                     int dbEnd = drawEnd < rRenderArea.y ? rRenderArea.y : drawEnd;
                     int exclCount = exclRanges.empty() ? 0 : exclRanges.size();
-                    int exclStart = -1; // Next exclusion range start Y coordinate
+                    int exclStart = -1;  // Next exclusion range start coordinate
+                    int exclEnd   = -1;
+                    int exclIndex = 0;
+
+                    // Find the next exclusion range index, set up initial free drawable height coordinates
+                    for(int e = 0; e < exclCount; e++) {
+                        const pair<int, int>& range = exclRanges.at(e);
+                        // If drawable height is in some exclusion, move it
+                        if(dbStart <= range.first && dbStart > range.second) {
+                            dbStart = range.second;
+                        } else if(dbEnd <= range.first && (dbEnd > range.second || range.second == 0)) {
+                            dbEnd = range.first;
+                        }
+                        // If this range is above the drawable height coordinate
+                        if(range.first <= dbStart) {
+                            exclStart = range.first;
+                            exclEnd   = range.second;
+                            exclIndex = e;
+                            // Make sure starting coordinate is not included inside the previous exclusion range
+                            if(e != 0) {
+                                int change = dbStart - exclRanges.at(e - 1).second;
+                                dbStart -= clamp(change, 0, rRenderArea.h);
+                                // Loop must go over them all again to ensure that moved coordinate did not fell into
+                                // other exclusion range.
+                                if(change > 0) {
+                                    e = 0;
+                                    continue;
+                                }
+                            }
+                            break;
+                        }
+                    }
                     
                     // THIS IS NOT WORKING PROPERLY, IT IS MESSED UP ...
                     for(int h = dbStart; h > dbEnd; h -= iRowsInterval) {
 
-                        // Check for falling into exclusion range
-                        if(exclStart == -1 || h == exclStart) {
-                            
-                            // Find the nearest exclusion range above the current coordinate
-                            bool setHeight = false;
-                            for(int e = 0; e < exclCount; e++) {
-                                const pair<int, int>& range = exclRanges.at(e);
-
-                                // Find out if height should not jump over the exclusion range
-                                if(h <= range.first && h > range.second) {
-                                    h = range.second; // Move out from the range
-                                    setHeight = true;
-
-                                    if(e == exclCount - 1) {
-                                        exclStart = 0;
-                                    } else {
-                                        exclStart = exclRanges.at(e + 1).first;
-                                    }
-                                    break;
-                                }
+                        // Check for touching exclusion range
+                        if(h == exclStart) {
+                            h = exclEnd; // Jump over it
+                            // Update next exclusion start and end coordinate, if there is any
+                            if(++exclIndex < exclCount) {
+                                const pair<int, int>& range = exclRanges.at(exclIndex);
+                                exclStart = range.first;
+                                exclEnd   = range.second;
+                            } else {
+                                exclStart = -1;
+                                exclEnd = -1;
                             }
-                            if(setHeight)
-                                continue;
-                            else if(h < 0)
-                                break;
                         }
 
                         // Obtain a current pixel color
@@ -452,29 +470,35 @@ namespace rp {
 
                     }
 
-                    // IT IS NEEDED TO SOMEHOW INSERT NEW EXCLUSION RANGE AND REMAIN IT SORTED, BUT IT LITERALLY
-                    // DUPLICATES, FOR NOW I DONT KNOW WHAT IS GOING ON (NEEDS REFACTOR FOR BETTER REDABILITY)
-                    auto newRange = pair<int, int>(dbStart, dbEnd);
-                    if(exclCount == 0) {
-                        exclRanges.push_back(newRange);
-                    } else {
-                        bool gotIt = false;
-                        for(int e = 0; e < exclCount; e++) {
-                            if(newRange.first >= exclRanges.at(e).first) {
-                                exclRanges.insert(exclRanges.begin() + e, newRange);
-                                gotIt = true;
-                                break;
-                            }
-                            #ifdef DEBUG
-                            if(column == iScreenWidth / 2) {
-                                cout << e << ": From " << exclRanges.at(e).first << " to " << exclRanges.at(e).second << endl;
-                            }
-                            #endif
-                        }
-                        if(!gotIt)
+                    // Invalid ranges are not allowed
+                    if(dbStart > dbEnd) {
+                        auto newRange = pair<int, int>(dbStart, dbEnd);
+                        if(exclCount == 0) {
                             exclRanges.push_back(newRange);
+                        } else {
+                            bool gotIt = false;
+                            for(int e = 0; e < exclCount; e++) {
+                                if(newRange.first >= exclRanges.at(e).first) {
+                                    exclRanges.insert(exclRanges.begin() + e, newRange);
+                                    gotIt = true;
+                                    break;
+                                }
+                            }
+                            if(!gotIt)
+                                exclRanges.push_back(newRange);
+                        }
                     }
 
+                    #ifdef DEBUG
+                    if(column == iScreenWidth / 2) {
+                        exclCount = exclRanges.size();
+                        cout << "For wall " << i << endl;
+                        for(int e = 0; e < exclCount; e++) {
+                            auto range = exclRanges.at(e);
+                            cout << "At " << e << ": From " << range.first << " to " << range.second << endl;
+                        }
+                    }
+                    #endif
 
                     SDL_UnlockSurface(sdlSurface);
 
