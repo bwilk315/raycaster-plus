@@ -67,6 +67,7 @@ namespace rp {
             map<int, vector<WallData>> tileWalls; // Tile ID -> Array of walls information
             map<int, Texture> texSources;         // Texture ID -> Texture source object
             map<string, int> texIds;              // File name -> Texture ID
+            vector<int> tileIds;                  // All types of tile IDs
 
             // Returns index in the tiles array that corresponds to the specified position
             int posAsDataIndex(int x, int y) const;
@@ -98,10 +99,11 @@ namespace rp {
             string getTextureName(int texId) const;
             const Texture* getTextureSource(int texId) const;
             const Texture* getTextureSource(const string& rpsFile) const;
+            const vector<int>* getTileIds() const;
             // Returns pointer to a vector of walls data defined for the specified tile, or null pointer on fail
             const vector<WallData>* getTileWalls(int tileId) const;
             // Returns index of the influenced wall, if necessary new wall is created
-            int setTileWall(int tileId, int wallIndex, WallData newData);
+            int setTileWall(int tileId, int wallIndex, const WallData& newData);
             // Returns ID of the loaded texture, or 0 on fail
             int loadTexture(const string& pngFile);
             // Returns number of a line which error occurred at, notice that the last line is also

@@ -76,6 +76,7 @@ namespace rp {
         this->tileWalls = map<int, vector<WallData>>();
         this->texSources = map<int, Texture>();
         this->texIds = map<string, int>();
+        this->tileIds = vector<int>();
     }
     Scene::Scene(int width, int height) {
         this->error = E_CLEAR;
@@ -85,6 +86,7 @@ namespace rp {
         this->tileWalls = map<int, vector<WallData>>();
         this->texSources = map<int, Texture>();
         this->texIds = map<string, int>();
+        this->tileIds = vector<int>();
     }
     Scene::Scene(const string& file) : Scene() {
         loadFromFile(file);
@@ -141,14 +143,19 @@ namespace rp {
             return nullptr;
         return &texSources.at(texIds.at(rpsFile));
     }
+    const vector<int>* Scene::getTileIds() const {
+        return &tileIds;
+    }
     const vector<WallData>* Scene::getTileWalls(int tileId) const {
         if(tileWalls.count(tileId) == 0)
             return nullptr;
         return &tileWalls.at(tileId);
     }
-    int Scene::setTileWall(int tileId, int wallIndex, WallData newData) {
-        if(tileWalls.count(tileId) == 0)
+    int Scene::setTileWall(int tileId, int wallIndex, const WallData& newData) {
+        if(tileWalls.count(tileId) == 0) {
+            tileIds.push_back(tileId);
             tileWalls.insert(pair<int, vector<WallData>>(tileId, vector<WallData>()));
+        }
         // Add new wall details entry if needed, index of influenced wall is returned
         int wallsCount = tileWalls.at(tileId).empty() ? 0 : tileWalls.at(tileId).size();
         if(wallIndex < 0 || wallIndex > wallsCount - 1) {
@@ -180,6 +187,11 @@ namespace rp {
             error = E_RPS_FAILED_TO_READ;
             return ln;
         }
+
+        tileWalls.clear();
+        texSources.clear();
+        texIds.clear();
+        tileIds.clear();
 
         string fileLine;
         int wdh = -1; // World data height (starting from top)
@@ -281,11 +293,9 @@ namespace rp {
                                 stof(args.at(9))
                             ),
                             encodeRGBA(
-                                // Add 1 to prevent the color from being pure black, because engine uses this color
-                                // in pixel-occupation status purposes.
-                                (uint8_t)clamp((int)stof(args.at(15)), MIN_CHANNEL, 255),
-                                (uint8_t)clamp((int)stof(args.at(16)), MIN_CHANNEL, 255),
-                                (uint8_t)clamp((int)stof(args.at(17)), MIN_CHANNEL, 255),
+                                (uint8_t)stof(args.at(15)),
+                                (uint8_t)stof(args.at(16)),
+                                (uint8_t)stof(args.at(17)),
                                 (uint8_t)stof(args.at(18))
                             ),
                             stof(args.at(10)),

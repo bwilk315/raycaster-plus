@@ -269,6 +269,12 @@ namespace rp {
             // Occupied Height Ranges vector, used for determining if pixels can be drawn
             vector<pair<int, int>> exclRanges;
 
+            #ifdef DEBUG
+            if(column == iScreenWidth/2) {
+                system("clear");
+            }
+            #endif
+
             while(keepWalking) {
                 if(walker->rayFlag == DDA::RF_FAIL)
                     break;
@@ -302,7 +308,7 @@ namespace rp {
 
                 // Collect draw information as pointers to dedicated structure
                 int wallCount = wallData->size();
-                int dipLen = 0; // drawInfoPtrs length
+                int dipLen = 0; // drawInfoPtrs length (used also as index)
                 ColumnDrawInfo* drawInfoPtrs[wallCount]; // Contains nullptrs if ray misses a wall
                 for(int i = 0; i != wallCount; i++) {
                     ColumnDrawInfo* cdi = new ColumnDrawInfo;
@@ -325,21 +331,28 @@ namespace rp {
                            (cdi->localInter.y >= cdi->wallDataPtr->func.yMin && cdi->localInter.y <= cdi->wallDataPtr->func.yMax)) {
 
                             cdi->perpDist = rayDir.dot(camDir) * ( hit.distance + interDist );
-                            drawInfoPtrs[i] = cdi;
-                            dipLen++;
+                            drawInfoPtrs[dipLen++] = cdi; // this was the case!!!
+
+                            // it draws from the intersection point?!
+                            #ifdef DEBUG
+                            if(column == iScreenWidth/2) {
+                                //cout << i <<  ": point=" << cdi->localInter << ", dist=" << cdi->perpDist << endl;
+                                cout << i << ": " << (drawInfoPtrs[i] == nullptr) << endl;
+                            }
+                            #endif
+
                             continue;
                         }
                     }
 
-                    // Ray missed that wall, therefore its information is garbage, leave it unset
-                    drawInfoPtrs[i] = nullptr;
+                    // Ray missed that wall, therefore its information is garbage
                     delete cdi;
                 }
 
                 // Sort the information in ascending order, perform it on pointers to avoid copying
-                for(int i = 0; i != wallCount; i++) {
-                    for(int j = 1; j != wallCount; j++) {
-                        if(drawInfoPtrs[j] != nullptr && (drawInfoPtrs[j - 1] == nullptr || drawInfoPtrs[j - 1]->perpDist > drawInfoPtrs[j]->perpDist)) {
+                for(int i = 0; i != dipLen; i++) {
+                    for(int j = 1; j < dipLen; j++) {
+                        if(drawInfoPtrs[j - 1]->perpDist > drawInfoPtrs[j]->perpDist) {
                             ColumnDrawInfo* temp = drawInfoPtrs[j];
                             drawInfoPtrs[j] = drawInfoPtrs[j - 1];
                             drawInfoPtrs[j - 1] = temp;
@@ -348,6 +361,7 @@ namespace rp {
                         }
                     }
                 }
+
 
                 // First walls are valid pointers, nullptrs are left far away
                 for(int i = 0; i != dipLen; i++) {
@@ -372,9 +386,9 @@ namespace rp {
                     int totalHeight = drawEnd - drawStart;
 
                     SDL_LockSurface(sdlSurface);
-
                     const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
                     bool isSolidColor = tex == nullptr;
+
 
                     int texHeight = isSolidColor ? 1 : tex->getHeight();
                     // Compute normalized horizontal position on the wall plane
@@ -391,11 +405,12 @@ namespace rp {
                     int exclIndex = 0; // Next exclusion index
 
                     // FOR NOW I DO NOT FIND ANY PROBLEMS WITH THE SOLUTION BELOW, NEEDS REFACTOR ANYWAYS
+                    // PROBLEM: WHEN VOID IS BEHING A WALL, ITS DRAWING IS NOT BEHAVING PROPERLY (PROBABLY?)
+                    // PROBLEM: DRAWING DOES NOT WORK WHEN MANY WALLS ARE SEEN
 
                     // Round the starting and ending drawable coordinates to the nearest exclusions if needed,
                     // also find exclusion from the starting perspective.
                     int minS = 1e8; // Minimum drawable coordinates distance to some
-                    int minE = 1e8; // nearest exclusion (used to catch the nearest ones).
                     for(int e = 0; e < exclCount; e++) {
                         const pair<int, int>& range = exclRanges.at(e);
                         int startDist = abs(range.first - dbStart);
@@ -424,9 +439,9 @@ namespace rp {
                             minS = startDist;
                         }
                     }
-                    
-                    for(int h = dbStart; h < dbEnd; h += iRowsInterval) {
 
+                    for(int h = dbStart; h < dbEnd; h += iRowsInterval) {
+                        
                         // Check for touching exclusion range, if it is detected save properties of the next range.
                         // Detailed checks prevent from losing pixels due to set rows interval.
                         if(h >= exclStart && h < exclStart + iRowsInterval) {
@@ -467,7 +482,7 @@ namespace rp {
                         color = SDL_MapRGB(sdlSurface->format, r, g, b);
                         for(int c = 0; c != iColumnsPerRay; c++)
                             for(int r = 0; r != iRowsInterval; r++)
-                                pixels[c + column + (h + r) * sdlSurface->h] = color;
+                                pixels[c + column + (h + r) * sdlSurface->w] = color;
 
                     }
 
@@ -500,13 +515,9 @@ namespace rp {
                     }
 
                 }
-
             }
 
             #ifdef DEBUG
-            if(column == iScreenWidth/2) {
-                //system("clear");
-            }
 
             SDL_UnlockSurface(sdlSurface);
             int exclCount = exclRanges.empty() ? 0 : exclRanges.size();
@@ -514,14 +525,14 @@ namespace rp {
                 auto range = exclRanges.at(e);
 
                 if(column == iScreenWidth/2) {
-                    //cout << "At " << e << ": From " << range.first << " to " << range.second << endl;
+                    cout << "At " << e << ": From " << range.first << " to " << range.second << endl;
                 }
 
                 // This draws line ranges
                 for(int c = 0; c < iColumnsPerRay; c++) {
                     for(int r = 0; r < iRowsInterval; r++) {
-                        pixels[c + column + (range.first + r) * sdlSurface->h] = SDL_MapRGB(sdlSurface->format, 0, 255, 0);
-                        pixels[c + column + (range.second + r) * sdlSurface->h] = SDL_MapRGB(sdlSurface->format, 255, 0, 0);
+                        pixels[c + column + (range.first + r) * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 0, 255, 0);
+                        pixels[c + column + (range.second + r) * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 255, 0, 0);
                     }
                 }
             }

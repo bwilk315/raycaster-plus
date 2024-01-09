@@ -2,8 +2,6 @@
 #include "../include/globals.hpp"
 
 namespace rp {
-    const int MIN_CHANNEL = 1;
-
     void decodeRGBA(uint32_t n, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a) {
         r = (n % 0x100000000 - n % 0x001000000) / 0x001000000;
         g = (n % 0x001000000 - n % 0x000010000) / 0x000010000;
