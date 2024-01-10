@@ -27,6 +27,7 @@ namespace rp {
     using ::std::chrono::duration;
     using ::std::pair;
     using ::std::map;
+    using ::std::make_pair;
     using ::std::sqrt;
     using ::std::tan;
 

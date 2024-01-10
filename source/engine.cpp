@@ -231,6 +231,8 @@ namespace rp {
         /********************************************/
         /********************************************/
 
+        const int rhStart = rRenderArea.y;
+        const int rhEnd   = rRenderArea.y + rRenderArea.h;
         // Perspective-correct minimum distance; if you stand this distance from the cube looking at it orthogonally,
         // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
         // located at height of 1/2.
@@ -266,8 +268,11 @@ namespace rp {
             walker->init(camPos, rayDir);
             bool keepWalking = true;
             
-            // Occupied Height Ranges vector, used for determining if pixels can be drawn
-            vector<pair<int, int>> exclRanges;
+            // YOU MUST DEPENDIZE THIS BELOW ON TILE ORDER, FOR NOW IT DOES NOT TAKE IT INTO ACCOUNT,
+            // THEREFORE TILES THAT ARE NEAR ARE NOT DRAWN BC FARER ONE IS CONSIDERED FIRST INSTEAD
+
+            // Vector of pairs indicating draw height exclusions as global pixel coordinate (key: start, value: end)
+            vector<pair<int, int>> drawExcls;
 
             #ifdef DEBUG
             if(column == iScreenWidth/2) {
@@ -331,15 +336,7 @@ namespace rp {
                            (cdi->localInter.y >= cdi->wallDataPtr->func.yMin && cdi->localInter.y <= cdi->wallDataPtr->func.yMax)) {
 
                             cdi->perpDist = rayDir.dot(camDir) * ( hit.distance + interDist );
-                            drawInfoPtrs[dipLen++] = cdi; // this was the case!!!
-
-                            // it draws from the intersection point?!
-                            #ifdef DEBUG
-                            if(column == iScreenWidth/2) {
-                                //cout << i <<  ": point=" << cdi->localInter << ", dist=" << cdi->perpDist << endl;
-                                cout << i << ": " << (drawInfoPtrs[i] == nullptr) << endl;
-                            }
-                            #endif
+                            drawInfoPtrs[dipLen++] = cdi;
 
                             continue;
                         }
@@ -349,21 +346,21 @@ namespace rp {
                     delete cdi;
                 }
 
+                if(dipLen == 0)
+                    continue;
+
+                // SOLUTION: MAKE STRUCTURE THAT TAKES TILE INTO ACCOUNT (I.E. NOT BY DETECTION OF THE LOWER BOUND)
                 // Sort the information in ascending order, perform it on pointers to avoid copying
                 for(int i = 0; i != dipLen; i++) {
-                    for(int j = 1; j < dipLen; j++) {
+                    for(int j = 1; j != dipLen; j++) {
                         if(drawInfoPtrs[j - 1]->perpDist > drawInfoPtrs[j]->perpDist) {
                             ColumnDrawInfo* temp = drawInfoPtrs[j];
                             drawInfoPtrs[j] = drawInfoPtrs[j - 1];
                             drawInfoPtrs[j - 1] = temp;
-                        } else {
-                            break;
                         }
                     }
                 }
 
-
-                // First walls are valid pointers, nullptrs are left far away
                 for(int i = 0; i != dipLen; i++) {
                     ColumnDrawInfo* cdi = drawInfoPtrs[i];
 
@@ -380,15 +377,14 @@ namespace rp {
 
                     // Find out range describing how column should be drawn for the current wall
                     int lineHeight  = rRenderArea.h * (pcmDist / cdi->perpDist);
-                    int drawStart   = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
-                    int drawEnd     = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
-                    int startClip   = drawEnd > rRenderArea.y + rRenderArea.h ? (drawEnd - rRenderArea.y - rRenderArea.h) : 0;
+                    int drawStart   = rhStart + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
+                    int drawEnd     = rhStart + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
+                    int startClip   = drawEnd > rhEnd ? (drawEnd - rhEnd) : 0;
                     int totalHeight = drawEnd - drawStart;
 
                     SDL_LockSurface(sdlSurface);
                     const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
                     bool isSolidColor = tex == nullptr;
-
 
                     int texHeight = isSolidColor ? 1 : tex->getHeight();
                     // Compute normalized horizontal position on the wall plane
@@ -397,66 +393,10 @@ namespace rp {
                         planeHorizontal = 1 - planeHorizontal;
 
                     // Draw column using drawable information
-                    int dbEnd = drawEnd - startClip;
-                    int dbStart = drawStart < rRenderArea.y ? rRenderArea.y : drawStart;
-                    int exclCount = exclRanges.empty() ? 0 : exclRanges.size();
-                    int exclStart = 0;  // Next exclusion range start coordinate
-                    int exclEnd   = 0;
-                    int exclIndex = 0; // Next exclusion index
-
-                    // FOR NOW I DO NOT FIND ANY PROBLEMS WITH THE SOLUTION BELOW, NEEDS REFACTOR ANYWAYS
-                    // PROBLEM: WHEN VOID IS BEHING A WALL, ITS DRAWING IS NOT BEHAVING PROPERLY (PROBABLY?)
-                    // PROBLEM: DRAWING DOES NOT WORK WHEN MANY WALLS ARE SEEN
-
-                    // Round the starting and ending drawable coordinates to the nearest exclusions if needed,
-                    // also find exclusion from the starting perspective.
-                    int minS = 1e8; // Minimum drawable coordinates distance to some
-                    for(int e = 0; e < exclCount; e++) {
-                        const pair<int, int>& range = exclRanges.at(e);
-                        int startDist = abs(range.first - dbStart);
-
-                        // Move start to the end if it is included in exclusion, then save properties of the next one
-                        if(dbStart >= range.first && dbStart < range.second) {
-                            dbStart = range.second;
-                            if(e == exclCount - 1) {
-                                // No limits, because there is no range left until the bottom
-                                exclStart = -1;
-                                exclEnd   = -1;
-                            } else {
-                                // Next range will exclude some area, save it
-                                const pair<int, int>& next = exclRanges.at(e + 1);
-                                exclStart = next.first;
-                                exclEnd   = next.second;
-                            }
-                            exclIndex = e + 1; // The current one is skipped by adding one
-                            e = 0; // Needs to be processed with every range again
-                            continue;
-                        // Otherwise check for the nearer range, save its properties if it is found
-                        } else if(startDist < minS) {
-                            exclStart = range.first;
-                            exclEnd   = range.second;
-                            exclIndex = e;
-                            minS = startDist;
-                        }
-                    }
+                    int dbStart = clamp(drawStart, rhStart, rhEnd);
+                    int dbEnd   = clamp(drawEnd - startClip, rhStart, rhEnd);
 
                     for(int h = dbStart; h < dbEnd; h += iRowsInterval) {
-                        
-                        // Check for touching exclusion range, if it is detected save properties of the next range.
-                        // Detailed checks prevent from losing pixels due to set rows interval.
-                        if(h >= exclStart && h < exclStart + iRowsInterval) {
-                            h = exclEnd; // Jump over it
-
-                            // Update next exclusion start and end coordinate, if there is any
-                            if(exclIndex < exclCount) {
-                                const pair<int, int>& range = exclRanges.at(exclIndex++);
-                                exclStart = range.first;
-                                exclEnd   = range.second;
-                            } else {
-                                exclStart = -1;
-                                exclEnd   = -1;
-                            }
-                        }
 
                         // Obtain a current pixel color
                         uint8_t r, g, b, a;
@@ -486,25 +426,7 @@ namespace rp {
 
                     }
 
-                    // Insert a valid range (so start is lesser than end in screen coordinates), and remain the whole
-                    // vector sorted.
-                    if(dbEnd > dbStart) {
-                        auto newRange = pair<int, int>(dbStart, dbEnd);
-                        if(exclCount == 0) {
-                            exclRanges.push_back(newRange);
-                        } else {
-                            bool gotIt = false;
-                            for(int e = 0; e < exclCount; e++) {
-                                if(newRange.first <= exclRanges.at(e).first) {
-                                    exclRanges.insert(exclRanges.begin() + e, newRange);
-                                    gotIt = true;
-                                    break;
-                                }
-                            }
-                            if(!gotIt)
-                                exclRanges.push_back(newRange);
-                        }
-                    }
+                    drawExcls.push_back(make_pair(dbStart, dbEnd));
 
                     SDL_UnlockSurface(sdlSurface);
 
@@ -513,20 +435,19 @@ namespace rp {
                         keepWalking = false;
                         break;
                     }
-
                 }
             }
 
             #ifdef DEBUG
 
             SDL_UnlockSurface(sdlSurface);
-            int exclCount = exclRanges.empty() ? 0 : exclRanges.size();
+            int exclCount = drawExcls.empty() ? 0 : drawExcls.size();
             for(int e = 0; e < exclCount; e++) {
-                auto range = exclRanges.at(e);
+                auto range = drawExcls.at(e);
 
-                if(column == iScreenWidth/2) {
-                    cout << "At " << e << ": From " << range.first << " to " << range.second << endl;
-                }
+                // if(column == iScreenWidth/2) {
+                //     cout << "At " << e << ": From " << range.first << " to " << range.second << endl;
+                // }
 
                 // This draws line ranges
                 for(int c = 0; c < iColumnsPerRay; c++) {

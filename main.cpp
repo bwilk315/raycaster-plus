@@ -19,7 +19,7 @@ int main() {
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
     float turnSpeed = M_PI * 0.66f;
-    Camera camera(Vector2(2.5f, 5.5f), M_PI/2-0.001f, fovAngle);
+    Camera camera(Vector2(5.5f, 5.5f), M_PI/2-0.001f, fovAngle);
     Engine engine(1000, 1000);
     bool lockCursor = false;
 
