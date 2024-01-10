@@ -34,7 +34,7 @@ namespace rp {
      * distance of a ray from the starting point using method `setMaxTileDistance`.
      * 
      * To start, tell the ray starting position and direction using `init` method, then simply call
-     * `next` method to obtain the next hit information.
+     * `next` method to obtain the next hit information (initial tile is included).
      * 
      * It is worth to mention about the `rayFlag` member - it tells you the current ray state, and gets
      * updated everytime you request a new ray information.
@@ -42,6 +42,7 @@ namespace rp {
     class DDA {
         private:
             bool initialized;
+            bool originDone; // Whether origin tile was returned
             int maxTileDist;
             int stepX, stepY;             // Direction of a ray stepping
             int planePosX, planePosY;     // Position of a tile the ray is currently in

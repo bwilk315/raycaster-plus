@@ -50,15 +50,11 @@ namespace rp {
                     // As in the scene loading, increase each of RGB channels to prevent it from being
                     // near pitch black color, which is used for pixel-detection by the engine.
                     uint8_t r, g, b, a;
-                    r = bytes[i + 0];
-                    g = bytes[i + 1];
-                    b = bytes[i + 2];
-                    a = bytes[i + 3];
                     this->pixels[i / 4] = encodeRGBA(
-                        clamp(r, MIN_CHANNEL, 255),
-                        clamp(g, MIN_CHANNEL, 255),
-                        clamp(b, MIN_CHANNEL, 255),
-                        a
+                        bytes[i + 0],
+                        bytes[i + 1],
+                        bytes[i + 2],
+                        bytes[i + 3]
                     );
                 }
             } else {

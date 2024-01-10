@@ -5,8 +5,9 @@
 #ifdef DEBUG
 #include <iostream>
 #endif
-#include <map>
 #include <chrono>
+#include <cmath>
+#include <map>
 #include <SDL2/SDL.h>
 #include "camera.hpp"
 #include "dda.hpp"
@@ -19,12 +20,16 @@ namespace rp {
     #ifdef DEBUG
     using ::std::cout;
     using ::std::endl;
+    using ::std::ostream;
     #endif
     using ::std::chrono::time_point;
     using ::std::chrono::system_clock;
     using ::std::chrono::duration;
     using ::std::pair;
     using ::std::map;
+    using ::std::make_pair;
+    using ::std::sqrt;
+    using ::std::tan;
 
     enum KeyState {
         NONE,  // Nothing happens
@@ -37,6 +42,18 @@ namespace rp {
         STRETCH, // Render gets stretched to fill the whole screen area
         SQUARE   // Render is the biggest square possible to fit with the current resolution
     };
+
+    struct ColumnDrawInfo {
+        float perpDist;              // Perpendicular distance from wall hit point to the camera plane
+        Vector2 localInter;          // Point of ray-wall lines intersection in local tile coordinates
+        const WallData* wallDataPtr; // Pointer to the hit wall structure
+
+        ColumnDrawInfo();
+        ColumnDrawInfo(float perpDist, const Vector2& localInter, const WallData* wallDataPtr);
+    };
+    #ifdef DEBUG
+    ostream& operator<<(ostream& stream, const ColumnDrawInfo& cdi);
+    #endif
 
     class Engine {
         private:
@@ -69,12 +86,8 @@ namespace rp {
             // This method is called when screen size changes, because pixels array must match the actual size
             void updateSurface();
 
-            // It is used once per ray to render walls of the tile in which it starts stepping
-            RayHitInfo simulateBoundaryEnter(const Vector2& pos, const Vector2& dir);
-
         public:
-            static const float MAX_LINE_SLOPE;
-
+            static const float SAFE_LINE_HEIGHT;
             enum {
                 E_CLEAR               = 0,
                 E_MAIN_CAMERA_NOT_SET = 1 << 1,

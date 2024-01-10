@@ -23,17 +23,18 @@ namespace rp {
     using ::std::string;
     using ::std::pair;
     using ::std::ifstream;
-    using ::std::stof;
     using ::std::abs;
+    using ::std::stof;
 
     /**
      * Defines a wall properties.
-     * You should call `updateBoundaryPoints` after changing `func` member, it ensures that
-     * boundary points `bp0` and `bp1` are up to date.
+     * You should call `updateMetrics` after changing `func` member, it ensures that variables responsible for
+     * proper wall texturing (`pivot` and `length`) are up to date.
      */
     struct WallData {
         LinearFunc func;  // Function describing top-down look of the wall
-        Vector2 bp0, bp1; // Intersection points of tile boundary and the function
+        Vector2 pivot;    // Point located in the left half of a tile, indicates the wall beginning
+        float length;     // Length of a wall
         float hMin, hMax; // Range of wall height to draw
         uint32_t tint;    // Tint color of the wall surface
         uint16_t texId;   // ID number of texture to use (0 indicates no texture)
@@ -41,8 +42,8 @@ namespace rp {
 
         WallData();
         WallData(const LinearFunc& func, const uint32_t& tint, float hMin, float hMax, uint16_t texId, bool stopsRay);
-        
-        void updateBoundaryPoints();
+
+        void updateMetrics();
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const WallData& wd);
@@ -66,6 +67,7 @@ namespace rp {
             map<int, vector<WallData>> tileWalls; // Tile ID -> Array of walls information
             map<int, Texture> texSources;         // Texture ID -> Texture source object
             map<string, int> texIds;              // File name -> Texture ID
+            vector<int> tileIds;                  // All types of tile IDs
 
             // Returns index in the tiles array that corresponds to the specified position
             int posAsDataIndex(int x, int y) const;
@@ -97,10 +99,11 @@ namespace rp {
             string getTextureName(int texId) const;
             const Texture* getTextureSource(int texId) const;
             const Texture* getTextureSource(const string& rpsFile) const;
-            // Returns vector of walls data defined for the specified tile, or empty vector on fail
-            vector<WallData> getTileWalls(int tileId) const;
+            const vector<int>* getTileIds() const;
+            // Returns pointer to a vector of walls data defined for the specified tile, or null pointer on fail
+            const vector<WallData>* getTileWalls(int tileId) const;
             // Returns index of the influenced wall, if necessary new wall is created
-            int setTileWall(int tileId, int wallIndex, WallData newData);
+            int setTileWall(int tileId, int wallIndex, const WallData& newData);
             // Returns ID of the loaded texture, or 0 on fail
             int loadTexture(const string& pngFile);
             // Returns number of a line which error occurred at, notice that the last line is also

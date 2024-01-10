@@ -17,6 +17,8 @@ namespace rp {
     using ::std::abs;
     using ::std::sqrt;
 
+    extern const float INV_SQRT2;
+
     class LinearFunc;
     class Vector2;
 
@@ -30,10 +32,6 @@ namespace rp {
         LinearFunc(float slope, float height);
         LinearFunc(float slope, float height, float xMin, float xMax);
         LinearFunc(float slope, float height, float xMin, float xMax, float yMin, float yMax);
-
-        float getValue(float argument) const;
-        float getDistanceFromPoint(const Vector2& point) const;
-        Vector2 getCommonPoint(const LinearFunc& other) const;
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const LinearFunc& func);

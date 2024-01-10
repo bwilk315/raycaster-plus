@@ -5,7 +5,10 @@
 using namespace rp;
 
 int main() {
+
     Scene scene;
+    // int line = scene.loadFromFile("local/debug.rps");
+    // int line = scene.loadFromFile("local/generated.rps");
     int line = scene.loadFromFile("resources/my_world.rps");
     std::cout << "Loading plane error " << scene.getError() << " at line " << line << std::endl;
     if(scene.getError())
@@ -16,8 +19,8 @@ int main() {
     const float moveSpeed = 2;
     const float fovAngle = M_PI / 2;
     float turnSpeed = M_PI * 0.66f;
-    Camera camera(Vector2(1.5f, 1.5f), M_PI/2-0.001f, fovAngle);
-    Engine engine(500, 1000);
+    Camera camera(Vector2(5.5f, 5.5f), M_PI/2-0.001f, fovAngle);
+    Engine engine(1000, 1000);
     bool lockCursor = false;
 
     engine.setCursorLock(lockCursor);
@@ -25,34 +28,47 @@ int main() {
     engine.setFrameRate(60);
     engine.setLightBehavior(true, 0);
     engine.setMainCamera(&camera);
-    engine.setRenderFitMode(RenderFitMode::STRETCH);
-    engine.setColumnsPerRay(1);
-    engine.setRowsInterval(1);
+    engine.setRenderFitMode(RenderFitMode::SQUARE);
+    engine.setColumnsPerRay(2);
+    engine.setRowsInterval(2);
     engine.getWalker()->setTargetScene(&scene);
     engine.getWalker()->setMaxTileDistance(21);
     
     SDL_SetWindowPosition(engine.getWindowHandle(), 0, 0);
 
-    bool efBillboard = true;
+    bool efFlying = true;
+    bool efBillboard = false;
     bool isTransforming = false;
-    bool isFreezed = false;
+
+    float heightChange = 0.0f;
+    float lastHC = 0.0f;
     
     while(engine.tick()) {
-        if(isTransforming) {
-            int frame = engine.getFrameCount();
-            SDL_Rect r = engine.getRenderArea();
 
-            engine.clear();
-            engine.render();
-            // engine.clear();
-            // engine.render();
+        // Flying illusion (by changing wall render heights)
+        if(efFlying) {
+            heightChange = 0.0f;
+            if(engine.getKeyState(SDL_SCANCODE_UP) == KeyState::PRESS)
+                heightChange -= engine.getElapsedTime();
+            if(engine.getKeyState(SDL_SCANCODE_DOWN) == KeyState::PRESS)
+                heightChange += engine.getElapsedTime();
 
-            isFreezed = false;
-            isTransforming = false;
-        } else if(!isFreezed) {
-            engine.clear();
-            engine.render();
-            isFreezed = true;
+            if(lastHC != heightChange) {
+                const vector<int>* tileIds = scene.getTileIds();
+                for(const int& tid : *tileIds) {
+                    const vector<WallData>* tileWalls = scene.getTileWalls(tid);
+                    for(int wid = 0; wid < tileWalls->size(); wid++) {
+                        WallData wd = tileWalls->at(wid);
+                        wd.hMin += heightChange;
+                        wd.hMax += heightChange;
+                        scene.setTileWall(tid, wid, wd);
+                    }
+                }
+
+                engine.clear();
+                engine.render();
+                lastHC = heightChange;
+            }
         }
 
         if(efBillboard) {
@@ -91,6 +107,13 @@ int main() {
         }
 
         /********* BASIC PLAYER MECHANICS **********/
+
+        if(isTransforming) {
+            engine.clear();
+            engine.render();
+            
+            isTransforming = false;
+        }
 
         // Game management
         if(engine.getKeyState(SDL_SCANCODE_ESCAPE) == KeyState::UP) {

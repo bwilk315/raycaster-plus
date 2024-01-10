@@ -9,11 +9,11 @@ namespace rp {
 
     WallData::WallData() {
         this->func = LinearFunc();
-        this->tint = 0;
-        this->bp0 = Vector2::ZERO;
-        this->bp1 = Vector2::ZERO;
+        this->pivot = Vector2::ZERO;
+        this->length = 0;
         this->hMin = 0;
         this->hMax = 1;
+        this->tint = 0;
         this->texId = 0;
         this->stopsRay = true;
     }
@@ -24,43 +24,39 @@ namespace rp {
         this->hMax = hMax;
         this->texId = texId;
         this->stopsRay = stopsRay;
-        updateBoundaryPoints();
+        updateMetrics();
     }
-    void WallData::updateBoundaryPoints() {
-        if(func.slope == 0) {
-            bp0.x = func.xMin;
-            bp0.y = func.height;
-            bp1.x = func.xMax;
-            bp1.y = func.height;
-            return;
-        }
-        // Very similar blocks, do not they?
-        bp0.x = (func.yMin - func.height) / func.slope;
-        if(bp0.x < func.xMin) {
-            bp0.x = func.xMin;
-            bp0.y = func.getValue(func.xMin);
-        } else if(bp0.x > func.xMax) {
-            bp0.x = func.xMax;
-            bp0.y = func.getValue(func.xMax);
+    void WallData::updateMetrics() {
+        pivot.y = func.slope * func.xMin + func.height;
+        if(pivot.y < func.yMin) {
+            pivot.x = (func.yMin - func.height) / func.slope;
+            pivot.y = func.yMin;
+        } else if(pivot.y > func.yMax) {
+            pivot.x = (func.yMax - func.height) / func.slope;
+            pivot.y = func.yMax;
         } else {
-            bp0.y = func.yMin;
+            pivot.x = func.xMin;
         }
-        bp1.x = (func.yMax - func.height) / func.slope;
-        if(bp1.x < func.xMin) {
-            bp1.x = func.xMin;
-            bp1.y = func.getValue(func.xMin);
-        } else if(bp1.x > func.xMax) {
-            bp1.x = func.xMax;
-            bp1.y = func.getValue(func.xMax); 
+
+        Vector2 end;
+        end.y = func.slope * func.xMax + func.height;
+        if(end.y < func.yMin) {
+            end.x = (func.yMin - func.height) / func.slope;
+            end.y = func.yMin;
+        } else if(end.y > func.yMax) {
+            end.x = (func.yMax - func.height) / func.slope;
+            end.y = func.yMax;
         } else {
-            bp1.y = func.yMax;
+            end.x = func.xMax;
         }
+
+        length = (end - pivot).magnitude();
     }
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const WallData& wd) {
-        stream << "WallData(func=" << wd.func << ", tint=" << wd.tint << ", bp0=" << wd.bp0;
-        stream << ", bp1=" << wd.bp1 << ", hMin=" << wd.hMin << ", hMax=" << wd.hMax << ", texId=";
-        stream << wd.texId << ", stopsRay=" << wd.stopsRay << ")";
+        stream << "WallData(func=" << wd.func << ", pivot=" << wd.pivot << ", length=" << wd.length;
+        stream << ", hMin=" << wd.hMin << ", hMax=" << wd.hMax << ", texId=" << wd.texId << ", stopsRay=";
+        stream << wd.stopsRay << ")";
         return stream;
     }
     #endif
@@ -80,6 +76,7 @@ namespace rp {
         this->tileWalls = map<int, vector<WallData>>();
         this->texSources = map<int, Texture>();
         this->texIds = map<string, int>();
+        this->tileIds = vector<int>();
     }
     Scene::Scene(int width, int height) {
         this->error = E_CLEAR;
@@ -89,6 +86,7 @@ namespace rp {
         this->tileWalls = map<int, vector<WallData>>();
         this->texSources = map<int, Texture>();
         this->texIds = map<string, int>();
+        this->tileIds = vector<int>();
     }
     Scene::Scene(const string& file) : Scene() {
         loadFromFile(file);
@@ -145,14 +143,19 @@ namespace rp {
             return nullptr;
         return &texSources.at(texIds.at(rpsFile));
     }
-    vector<WallData> Scene::getTileWalls(int tileId) const {
-        if(tileWalls.count(tileId) == 0)
-            return vector<WallData>();
-        return tileWalls.at(tileId);
+    const vector<int>* Scene::getTileIds() const {
+        return &tileIds;
     }
-    int Scene::setTileWall(int tileId, int wallIndex, WallData newData) {
+    const vector<WallData>* Scene::getTileWalls(int tileId) const {
         if(tileWalls.count(tileId) == 0)
+            return nullptr;
+        return &tileWalls.at(tileId);
+    }
+    int Scene::setTileWall(int tileId, int wallIndex, const WallData& newData) {
+        if(tileWalls.count(tileId) == 0) {
+            tileIds.push_back(tileId);
             tileWalls.insert(pair<int, vector<WallData>>(tileId, vector<WallData>()));
+        }
         // Add new wall details entry if needed, index of influenced wall is returned
         int wallsCount = tileWalls.at(tileId).empty() ? 0 : tileWalls.at(tileId).size();
         if(wallIndex < 0 || wallIndex > wallsCount - 1) {
@@ -184,6 +187,11 @@ namespace rp {
             error = E_RPS_FAILED_TO_READ;
             return ln;
         }
+
+        tileWalls.clear();
+        texSources.clear();
+        texIds.clear();
+        tileIds.clear();
 
         string fileLine;
         int wdh = -1; // World data height (starting from top)
@@ -285,11 +293,9 @@ namespace rp {
                                 stof(args.at(9))
                             ),
                             encodeRGBA(
-                                // Add 1 to prevent the color from being pure black, because engine uses this color
-                                // in pixel-occupation status purposes.
-                                (uint8_t)clamp((int)stof(args.at(15)), MIN_CHANNEL, 255),
-                                (uint8_t)clamp((int)stof(args.at(16)), MIN_CHANNEL, 255),
-                                (uint8_t)clamp((int)stof(args.at(17)), MIN_CHANNEL, 255),
+                                (uint8_t)stof(args.at(15)),
+                                (uint8_t)stof(args.at(16)),
+                                (uint8_t)stof(args.at(17)),
                                 (uint8_t)stof(args.at(18))
                             ),
                             stof(args.at(10)),

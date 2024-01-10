@@ -3,6 +3,8 @@
 
 namespace rp {
     
+    const float INV_SQRT2 = sqrtf(2.0f);
+
     /********************************************/
     /********** STRUCTURE: LINEAR FUNC **********/
     /********************************************/
@@ -26,16 +28,6 @@ namespace rp {
     LinearFunc::LinearFunc(float slope, float height, float xMin, float xMax, float yMin, float yMax) : LinearFunc(slope, height, xMin, xMax) {
         this->yMin = yMin;
         this->yMax = yMax;
-    }
-    float LinearFunc::getValue(float argument) const {
-        return slope * argument + height;
-    }
-    float LinearFunc::getDistanceFromPoint(const Vector2& point) const {
-        return abs(slope * point.x - point.y + height) / sqrt(slope * slope + 1);
-    }
-    Vector2 LinearFunc::getCommonPoint(const LinearFunc& other) const {
-        float x = (this->height - other.height) / (other.slope - this->slope);
-        return Vector2(x, getValue(x));
     }
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const LinearFunc& func) {
