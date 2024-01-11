@@ -31,10 +31,6 @@ namespace rp {
 
     const float Engine::SAFE_LINE_HEIGHT = 0.0001f;
 
-    void Engine::updateSurface() {
-        sdlSurface = SDL_GetWindowSurface(sdlWindow);
-        pixels = (uint32_t*)sdlSurface->pixels;
-    }
     Engine::Engine(int screenWidth, int screenHeight) {
         this->bClear             = false;
         this->bIsCursorLocked    = false;
@@ -42,12 +38,12 @@ namespace rp {
         this->bRedraw            = false;
         this->bRun               = true;
         this->iError             = E_CLEAR;
-        this->iColumnsPerRay     = 0;
-        this->iFramesPerSecond   = 0;
-        this->iRowsInterval      = 0;
-        this->iScreenWidth       = screenWidth;
-        this->iScreenHeight      = screenHeight;
-        this->fAspectRatio       = screenHeight / (float)screenWidth;
+        this->iColumnsPerRay     = 1;
+        this->iFramesPerSecond   = 60;
+        this->iRowsInterval      = 1;
+        this->iScreenWidth       = screenWidth < 1 ? 1 : screenWidth;
+        this->iScreenHeight      = screenHeight < 1 ? 1 : screenHeight;
+        this->fAspectRatio       = iScreenHeight / (float)iScreenWidth;
         this->frameIndex         = 0;
         this->renderFitMode      = RenderFitMode::UNKNOWN;
         this->vLightDir          = Vector2::RIGHT;
@@ -64,8 +60,11 @@ namespace rp {
             this->sdlWindow  = SDL_CreateWindow("Raycaster Plus Engine", 0, 0, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
             if(sdlWindow != nullptr) {
                 SDL_SetWindowResizable(this->sdlWindow, SDL_FALSE);
-                updateSurface();
-                return;
+                this->sdlSurface = SDL_GetWindowSurface(sdlWindow);
+                if(sdlSurface != nullptr) {
+                    pixels = (uint32_t*)sdlSurface->pixels;
+                    return;
+                }
             }
         }
         iError |= E_SDL;
@@ -73,17 +72,18 @@ namespace rp {
     Engine::~Engine() {
         if(walker != nullptr)
             delete walker;
-
-        // SDL owns pixel and surface data, so no need to free it by hand
-        if(iError != E_SDL) {
-            SDL_DestroyWindowSurface(sdlWindow);
+        if(sdlWindow != nullptr)
             SDL_DestroyWindow(sdlWindow);
+        if(iError != E_SDL) {
             SDL_QuitSubSystem(SDL_INIT_VIDEO);
             SDL_Quit();
         }
     }
     void Engine::clear() {
         bClear = true;
+    }
+    const SDL_PixelFormat* Engine::getColorFormat() const {
+        return sdlSurface == nullptr ? nullptr : sdlSurface->format;
     }
     void Engine::stop() {
         bRun = false;
@@ -92,13 +92,10 @@ namespace rp {
         bIsCursorLocked = locked;
     }
     void Engine::setCursorVisibility(bool visible) {
-        SDL_ShowCursor(visible);
+        if(SDL_ShowCursor(visible) < 0)
+            iError |= E_SDL;
     }
     void Engine::setColumnsPerRay(int n) {
-        if(rRenderArea.w == 0) {
-            iError |= E_WRONG_CALL_ORDER;
-            return;
-        }
         iColumnsPerRay = clamp(n, 1, rRenderArea.w);
     }
     void Engine::setFrameRate(int fps) {
@@ -112,10 +109,6 @@ namespace rp {
         mainCamera = camera;
     }
     void Engine::setRowsInterval(int n) {
-        if(rRenderArea.h == 0) {
-            iError |= E_WRONG_CALL_ORDER;
-            return;
-        }
         iRowsInterval = clamp(n, 1, rRenderArea.h);
     }
     void Engine::setRenderFitMode(const RenderFitMode& rfm) {
@@ -172,7 +165,7 @@ namespace rp {
     KeyState Engine::getKeyState(int sc) const {
         return keyStates.count(sc) == 0 ? KeyState::NONE : keyStates.at(sc);
     }
-    DDA* const Engine::getWalker() {
+    DDA* Engine::getWalker() {
         return walker;
     }
     SDL_Window* Engine::getWindowHandle() {
@@ -181,7 +174,7 @@ namespace rp {
     bool Engine::tick() {
         if(iError) {
             stop();
-            return false;
+            return bRun;
         }
 
         // Compute the time duration elapsed since the last method call
@@ -328,8 +321,9 @@ namespace rp {
 
                     // Distance is negative when a wall is not reached by the ray, this and the fact that the longest
                     // distance in tile boundary is 1/sqrt(2), can be used to perform early classification.
-                    if(interDist >= 0 && interDist <= INV_SQRT2) {
+                    if(interDist >= 0 && interDist <= SQRT2) {
                         cdi->localInter = interDist * rayDir + rayEnter;
+
 
                         // Check if point is included in arguments and values range
                         if((cdi->localInter.x >= cdi->wallDataPtr->func.xMin && cdi->localInter.x <= cdi->wallDataPtr->func.xMax) &&
@@ -383,6 +377,7 @@ namespace rp {
                     int totalHeight = drawEnd - drawStart;
 
                     SDL_LockSurface(sdlSurface);
+                    
                     const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
                     bool isSolidColor = tex == nullptr;
 
@@ -399,13 +394,12 @@ namespace rp {
                     for(int h = dbStart; h < dbEnd; h += iRowsInterval) {
 
                         // Obtain a current pixel color
-                        uint8_t r, g, b, a;
-                        uint32_t color;
+                        uint8_t tr, tg, tb, ta;
                         if(isSolidColor) {
-                            decodeRGBA(cdi->wallDataPtr->tint, r, g, b, a);
+                            SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurface->format, &tr, &tg, &tb, &ta);
                         } else {
                             float planeVertical = 1.0f - (h - drawStart) / (float)totalHeight;
-                            decodeRGBA(tex->getCoords(planeHorizontal, planeVertical), r, g, b, a);
+                            SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical), sdlSurface->format, &tr, &tg, &tb, &ta);
                         }
 
                         // Apply lightning to the color
@@ -413,13 +407,13 @@ namespace rp {
                             const float minBn = 0.2f;
                             float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
                             float bn = minBn + (1 - minBn) * perc; // Final brightness
-                            r *= bn;
-                            g *= bn;
-                            b *= bn;
+                            tr *= bn;
+                            tg *= bn;
+                            tb *= bn;
                         }
 
                         // Draw pixel to the buffer
-                        color = SDL_MapRGB(sdlSurface->format, r, g, b);
+                        uint32_t color = SDL_MapRGB(sdlSurface->format, tr, tg, tb);
                         for(int c = 0; c != iColumnsPerRay; c++)
                             for(int r = 0; r != iRowsInterval; r++)
                                 pixels[c + column + (h + r) * sdlSurface->w] = color;

@@ -68,7 +68,7 @@ namespace rp {
     int Scene::posAsDataIndex(int x, int y) const {
         return width * (height - y - 1) + x;
     }
-    Scene::Scene() {
+    Scene::Scene(const SDL_PixelFormat* colorFormat) {
         this->error = E_CLEAR;
         this->width = 0;
         this->height = 0;
@@ -77,18 +77,14 @@ namespace rp {
         this->texSources = map<int, Texture>();
         this->texIds = map<string, int>();
         this->tileIds = vector<int>();
+        this->colorFormat = colorFormat;
     }
-    Scene::Scene(int width, int height) {
-        this->error = E_CLEAR;
+    Scene::Scene(const SDL_PixelFormat* colorFormat, int width, int height) : Scene(colorFormat) {
         this->width = width;
         this->height = height;
         this->tiles = new int[width * height];
-        this->tileWalls = map<int, vector<WallData>>();
-        this->texSources = map<int, Texture>();
-        this->texIds = map<string, int>();
-        this->tileIds = vector<int>();
     }
-    Scene::Scene(const string& file) : Scene() {
+    Scene::Scene(const SDL_PixelFormat* colorFormat, const string& file) : Scene(colorFormat) {
         loadFromFile(file);
     }
     Scene::~Scene() {
@@ -170,7 +166,7 @@ namespace rp {
             return texIds.at(pngFile);
         // Add a new texture entry, if loading failed then erase it, returns the texture ID
         int id = texIds.size() + 1;
-        texSources.insert(pair<int, Texture>(id, Texture()));
+        texSources.insert(pair<int, Texture>(id, Texture(colorFormat)));
         texSources.at(id).loadFromFile(pngFile);
         if(texSources.at(id).getError()) {
             texSources.erase(id);
@@ -292,7 +288,8 @@ namespace rp {
                                 stof(args.at(8)),
                                 stof(args.at(9))
                             ),
-                            encodeRGBA(
+                            SDL_MapRGBA(
+                                colorFormat,
                                 (uint8_t)stof(args.at(15)),
                                 (uint8_t)stof(args.at(16)),
                                 (uint8_t)stof(args.at(17)),

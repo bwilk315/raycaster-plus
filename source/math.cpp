@@ -3,7 +3,8 @@
 
 namespace rp {
     
-    const float INV_SQRT2 = sqrtf(2.0f);
+    const float SQRT2 = 1.41421356f;
+    const float INV_SQRT2 = 0.70710678f;
 
     /********************************************/
     /********** STRUCTURE: LINEAR FUNC **********/

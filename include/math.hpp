@@ -1,6 +1,6 @@
 
 #ifndef _RP_MATH_HPP
-#define _RP_MATH_HPP
+#define _RP_MATH_HPP 
 
 #ifdef DEBUG
 #include <iostream>
@@ -17,6 +17,7 @@ namespace rp {
     using ::std::abs;
     using ::std::sqrt;
 
+    extern const float SQRT2;
     extern const float INV_SQRT2;
 
     class LinearFunc;

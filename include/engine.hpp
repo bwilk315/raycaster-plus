@@ -2,26 +2,18 @@
 #ifndef _RP_ENGINE_HPP
 #define _RP_ENGINE_HPP
 
-#ifdef DEBUG
-#include <iostream>
-#endif
 #include <chrono>
 #include <cmath>
 #include <map>
 #include <SDL2/SDL.h>
+#include "globals.hpp"
 #include "camera.hpp"
 #include "dda.hpp"
-#include "globals.hpp"
 #include "math.hpp"
 #include "scene.hpp"
 #include "texture.hpp"
 
 namespace rp {
-    #ifdef DEBUG
-    using ::std::cout;
-    using ::std::endl;
-    using ::std::ostream;
-    #endif
     using ::std::chrono::time_point;
     using ::std::chrono::system_clock;
     using ::std::chrono::duration;
@@ -32,7 +24,7 @@ namespace rp {
     using ::std::tan;
 
     enum KeyState {
-        NONE,  // Nothing happens
+        NONE,
         DOWN,  // Key got pressed (single event)
         PRESS, // Key is pressed
         UP     // Key is not pressed anymore (single event)
@@ -83,16 +75,12 @@ namespace rp {
             SDL_Surface*  sdlSurface;
             SDL_Window*   sdlWindow;
 
-            // This method is called when screen size changes, because pixels array must match the actual size
-            void updateSurface();
-
         public:
             static const float SAFE_LINE_HEIGHT;
             enum {
                 E_CLEAR               = 0,
-                E_MAIN_CAMERA_NOT_SET = 1 << 1,
-                E_WRONG_CALL_ORDER    = 1 << 2, // Happens when you perform action that is dependant on other one (not called yet)
-                E_SDL                 = 1 << 3  // When SDL reports some error
+                E_SDL                 = 1 << 1,  // When SDL reports some error
+                E_MAIN_CAMERA_NOT_SET = 1 << 2
             };
 
             Engine(int screenWidth, int screenHeight);
@@ -100,6 +88,8 @@ namespace rp {
 
             /* Makes all pixels of the render area black once per frame */
             void clear();
+
+            const SDL_PixelFormat* getColorFormat() const;
 
             /* Returns an overall error code that in binary form represents whether some error occurred (1) or not (0),
                see `E_<error_name>` constants for more details about individual errors. */ 
@@ -126,7 +116,7 @@ namespace rp {
 
             /* Returns pointer to the DDA algorithm provider, also known as "walker" because it makes ray walking
                possible. You can customize it to your needs through its interface (see `DDA` class for details). */
-            DDA* const getWalker();
+            DDA* getWalker();
 
             /* Returns pointer to the SDL window structure, you can use it to do things not supported by the engine */
             SDL_Window* getWindowHandle();
