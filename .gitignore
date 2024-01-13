@@ -2,3 +2,6 @@
 # Local directories
 .vscode
 local
+
+# Local files
+build.exe
