@@ -62,7 +62,7 @@ namespace rp {
             bool     isLoaded() const noexcept;
 
             /* Tries to load pixel data from the specified PNG image file `pngFile` */
-            void loadFromFile(const string& pngFile);
+            void     loadFromFile(const string& pngFile);
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Texture& tex);
