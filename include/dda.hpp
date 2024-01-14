@@ -2,23 +2,16 @@
 #ifndef _RP_DDA_HPP
 #define _RP_DDA_HPP
 
-#ifdef DEBUG
-#include <iostream>
-#endif
-#include "scene.hpp"
+#include "globals.hpp"
 #include "math.hpp"
+#include "scene.hpp"
 
 namespace rp {
-    #ifdef DEBUG
-    using ::std::ostream;
-    using ::std::cout;
-    using ::std::endl;
-    #endif
 
     struct RayHitInfo {
-        float distance; // Distance of hit point to the starting position
-        Vector2 tile;   // Position of a hit tile
-        Vector2 point;  // Position of the ray-tile intersection point
+        float   distance; // Distance of hit point to the starting position
+        Vector2 tile;     // Position of a hit tile
+        Vector2 point;    // Position of the ray-tile intersection point
 
         RayHitInfo();
         RayHitInfo(float distance, Vector2 tile, Vector2 point);
@@ -41,20 +34,21 @@ namespace rp {
      */
     class DDA {
         private:
-            bool initialized;
-            bool originDone; // Whether origin tile was returned
-            int maxTileDist;
-            int stepX, stepY;             // Direction of a ray stepping
-            int planePosX, planePosY;     // Position of a tile the ray is currently in
-            float deltaDistX, deltaDistY; // Distances needed to move by one unit in both axes
-            float sideDistX, sideDistY;   // Currently-traveled distance by moving one unit in both axes
-            Vector2 start;     // Cached ray starting point
-            Vector2 direction; // Cached ray stepping direction (normalized)
+            bool    initialized;
+            bool    originDone; // Whether origin tile was already returned
+            int     maxTileDist;
+            int     stepX, stepY;           // Direction of a ray stepping
+            int     planePosX, planePosY;   // Position of a tile the ray is currently in
+            float   deltaDistX, deltaDistY; // Distances needed to move by one unit in both axes
+            float   sideDistX, sideDistY;   // Currently-traveled distance by moving one unit in both axes
+            Vector2 start;                  // Cached ray starting point
+            Vector2 direction;              // Cached ray stepping direction (normalized)
 
-            const Scene* scene = nullptr;
+            const Scene* scene;
+
         public:
-            const float MAX_DD = 1e30f; // Maximum delta distance for both axes
-            int rayFlag;
+            const float MAX_DD = 1e10f; // Maximum delta distance for both axes
+            int         rayFlag;
             // Ray flags telling various things about a ray
             enum {
                 RF_CLEAR    = 0,
@@ -68,13 +62,26 @@ namespace rp {
             DDA();
             DDA(const Scene* scene);
             DDA(const Scene* scene, int maxTileDist);
+            
+            /* Returns maximum tile distance the ray can reach */
+            float        getMaxTileDistance() const;
 
-            void setTargetScene(const Scene* scene);
-            void setMaxTileDistance(float distance);
-            float getMaxTileDistance() const;
+            /* Returns a pointer to the target `Scene` class instance, on which DDA is performed */
             const Scene* getTargetScene() const;
-            void init(const Vector2& start, const Vector2& direction);
-            RayHitInfo next();
+
+            /* Prepares things that are necessary for performing continous ray-walking */
+            void         init(const Vector2& start, const Vector2& direction);
+
+            /* Returns information about a next ray-tile collision only if tile ID is not equal zero,
+             * otherwise returns empty information structure. Notice that this method controls `rayFlag`,
+             * you should check it after every call. */
+            RayHitInfo   next();
+
+            /* Sets the target scene, on which rays will be walking */
+            void         setTargetScene(const Scene* scene);
+
+            /* Sets maximum distance a ray can reach */
+            void         setMaxTileDistance(float distance);
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const DDA& dda);

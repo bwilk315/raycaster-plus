@@ -19,11 +19,11 @@ namespace rp {
      */
     class Texture {
         private:
-            bool loaded;
-            mutable int error;
-            int width;
-            int height;
-            uint32_t* pixels;
+            bool                   loaded;
+            mutable int            error;
+            int                    width;
+            int                    height;
+            uint32_t*              pixels;
             const SDL_PixelFormat* format;
         public:
             enum {

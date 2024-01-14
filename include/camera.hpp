@@ -2,34 +2,29 @@
 #ifndef _RP_CAMERA_HPP
 #define _RP_CAMERA_HPP
 
-#ifdef DEBUG
-#include <iostream>
-#endif
 #include "globals.hpp"
 #include "math.hpp"
 
 namespace rp {
-    #ifdef DEBUG
-    using ::std::ostream;
-    #endif
     using ::std::abs;
 
     /**
-     * Provides theoretical camera functionality (practical part is done by engine).
+     * Provides theoretical two-dimensional camera functionality.
      * 
      * Camera is built by composing three vectors: `position`, `direction` and `plane`. `position` vector
-     * tells the camera position, `direction` obviously its looking direction, and `plane` the one
+     * tells the camera position, `direction` obviously its looking direction, and `plane` the one always
      * clockwisely-perpendicular to the `direction` vector.
-     * `plane` vector (and its magnitude) is especially important: it simulates a screen space in form of
-     * a line (as if you were looking at your monitor from the top).
+     * `plane` vector is especially important: it simulates right half of the projection line, you can think
+     * of it as half of your monitor appearing from the top.
      */
     class Camera {
         private:
-            float fieldOfView;
-            float planeMagnitude;
+            float   fieldOfView;
+            float   planeMagnitude;
             Vector2 plane;
             Vector2 position;
             Vector2 direction;
+            
         public:
             static const float DIR_BIAS;
             static const float MIN_FOV;
@@ -37,15 +32,33 @@ namespace rp {
 
             Camera();
             Camera(Vector2 position, float viewAngle, float fieldOfView);
-            float getFieldOfView() const;
-            Vector2 getPlane() const;
-            Vector2 getPosition() const;
+
+            /* Rotates the looking direction vector by `radians` rad counter-clockwisely */
+            void    changeDirection(float radians);
+            
+            /* Moves the camera using given vector `change` */
+            void    changePosition(Vector2 change);
+
+            /* Returns camera looking direction vector */
             Vector2 getDirection() const;
-            void changeDirection(float radians);
-            void changePosition(Vector2 change);
-            void setDirection(float radians);
-            void setFieldOfView(float radians);
-            void setPosition(Vector2 position);
+
+            /* Returns camera field of view angle */
+            float   getFieldOfView() const;
+
+            /* Returns camera projection plane vector */
+            Vector2 getPlane() const;
+            
+            /* Returns camera position */
+            Vector2 getPosition() const;
+
+            /* Sets the looking direction to angle of `radians` rad counter-clockwise */
+            void    setDirection(float radians);
+
+            /* Sets camera field of view angle to `radians` rad */
+            void    setFieldOfView(float radians);
+
+            /* Sets camera position using given vector `position` */
+            void    setPosition(Vector2 position);
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Camera& cam);
