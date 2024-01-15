@@ -2,18 +2,11 @@
 #ifndef _RP_MATH_HPP
 #define _RP_MATH_HPP 
 
-#ifdef DEBUG
-#include <iostream>
-#endif
 #include <cmath>
 #include <vector>
+#include "globals.hpp"
 
 namespace rp {
-    #ifdef DEBUG
-    using ::std::ostream;
-    using ::std::cout;
-    using ::std::endl;
-    #endif
     using ::std::abs;
     using ::std::sqrt;
 
