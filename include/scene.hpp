@@ -81,28 +81,57 @@ namespace rp {
             Scene(const SDL_PixelFormat* colorFormat, int width, int height);
             Scene(const SDL_PixelFormat* colorFormat, const string& rpsFile);
             ~Scene();
+
+            /* Returns if point ( `x`, `y` ) is included in the scene bounds */
             bool checkPosition(int x, int y) const;
-            bool setTileId(int x, int y, int tileId);
-            int getError() const;
-            // Returns ID of a tile at the specified position, or 0 on fail
+            
+	    /* Sets ID of a tile localized at ( `x`, `y` ) to `tileId`, returns whether operation was
+	     * successfull. This function does not override source file.  */
+	    bool setTileId(int x, int y, int tileId);
+            
+	    /* Returns latest error code set by the class instance */
+	    int getError() const;
+            
+	    /* Returns ID of a tile localized at ( `x`, `y` ) if possible, otherwise returns 0 */
             int getTileId(int x, int y) const;
-            int getWidth() const;
+            
+	    /* Returns width of the scene in tiles */
+	    int getWidth() const;
+
+	    /* Returns height of the scene in tiles */
             int getHeight() const;
-            // Returns 0 if failed
+
+	    /* Returns array index of a texture with file name `rpsFile` if it is loaded, otherwise
+	     * returns 0. */
             int getTextureId(const string& rpsFile) const;
-            // Returns empty string if failed
+            
+	    /* Returns file name of a texture with array index of `texId` if it is loaded, otherwise
+	     * returns empty string. */
             string getTextureName(int texId) const;
+
+	    /* Returns pointer to a `Texture` class instance that got loaded at `texId` array index
+	     * or using `rpsFile` file, otherwise returns null pointer. */
             const Texture* getTextureSource(int texId) const;
             const Texture* getTextureSource(const string& rpsFile) const;
+
+	    /* Returns pointer to a vector holding all types of tile IDs */
             const vector<int>* getTileIds() const;
-            // Returns pointer to a vector of walls data defined for the specified tile, or null pointer on fail
+
+	    /* Returns pointer to a vector filled with information about every wall defined for the specified
+	     * tile ID `tileId`, returns null pointer on fail. */
             const vector<WallData>* getTileWalls(int tileId) const;
-            // Returns index of the influenced wall, if necessary new wall is created
+
+	    /* Appends new or edits existing data of a wall at array index `wallIndex` of tiles with ID
+	     * of `tileId`. Returns array index of an edited wall, it may not always be `wallIndex`, like
+	     * when wall does not exists and new one must be created. */
             int setTileWall(int tileId, int wallIndex, const WallData& newData);
-            // Returns ID of the loaded texture, or 0 on fail
+
+	    /* Loads texture from file `pngFile` to an array. Returns array index at which the texture was
+	     * loaded but incremented by one, if failed returns 0. */
             int loadTexture(const string& pngFile);
-            // Returns number of a line which error occurred at, notice that the last line is also
-            // returned when interpretation is finished, therefore you should additionally check error state. 
+
+	    /* Loads scene from RPS (Raycaster Plus Scene) file `file`, returns line at which interpretation
+	     * error occurred or the last line with error not set. */ 
             int loadFromFile(const string& file);
     };
     #ifdef DEBUG
