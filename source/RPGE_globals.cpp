@@ -1,7 +1,7 @@
 
-#include "../include/globals.hpp"
+#include <RPGE_globals.hpp>
 
-namespace rp {
+namespace rpge {
     bool isFloat(const string& str) {
         istringstream iss(str);
         float _;

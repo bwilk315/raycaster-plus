@@ -1,12 +1,12 @@
 
-#ifndef _RP_DDA_HPP
-#define _RP_DDA_HPP
+#ifndef _RPGE_DDA_HPP
+#define _RPGE_DDA_HPP
 
-#include "globals.hpp"
-#include "math.hpp"
-#include "scene.hpp"
+#include "RPGE_globals.hpp"
+#include "RPGE_math.hpp"
+#include "RPGE_scene.hpp"
 
-namespace rp {
+namespace rpge {
 
     struct RayHitInfo {
         float   distance; // Distance of hit point to the starting position

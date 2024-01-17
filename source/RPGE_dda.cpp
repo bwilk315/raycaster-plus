@@ -1,9 +1,7 @@
 
-#include "../include/dda.hpp"
+#include <RPGE_dda.hpp>
 
-#include <iostream>
-
-namespace rp {
+namespace rpge {
 
     /*********************************************/
     /********** STRUCTURE: RAY HIT INFO **********/

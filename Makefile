@@ -12,7 +12,7 @@ OUT    = $(out)
 LIBZ   = -I$(libz)/include -L$(libz)/lib -lz
 LIBPNG = -I$(libpng)/include -L$(libpng)/lib -lpng
 LIBSDL = -I$(libsdl)/include -L$(libsdl)/lib -lSDL2
-EXTS   = $(LIBZ) $(LIBPNG) $(LIBSDL)
+EXTS   = -I$(shell pwd)/include $(LIBZ) $(LIBPNG) $(LIBSDL)
 
 all: clean camera dda engine globals math scene texture
 	@echo Creating library archive file ...
@@ -52,32 +52,32 @@ all: clean camera dda engine globals math scene texture
 	@echo Library successfuly built
 
 camera: globals math
-	@echo Compiling camera.cpp ...
-	g++ -c source/camera.cpp $(EXTS) -o $(OUT)/camera.o
+	@echo Compiling camera ...
+	g++ -c source/RPGE_camera.cpp $(EXTS) -o $(OUT)/RPGE_camera.o
 
 dda: globals math scene
-	@echo Compiling dda.cpp ...
-	g++ -c source/dda.cpp $(EXTS) -o $(OUT)/dda.o
+	@echo Compiling dda ...
+	g++ -c source/RPGE_dda.cpp $(EXTS) -o $(OUT)/RPGE_dda.o
 
 engine: camera dda globals math scene texture
-	@echo Compiling engine.cpp ...
-	g++ -c source/engine.cpp $(EXTS) -o $(OUT)/engine.o
+	@echo Compiling engine ...
+	g++ -c source/RPGE_engine.cpp $(EXTS) -o $(OUT)/RPGE_engine.o
 
 globals:
-	@echo Compiling globals.cpp ...
-	g++ -c source/globals.cpp $(EXTS) -o $(OUT)/globals.o
+	@echo Compiling globals ...
+	g++ -c source/RPGE_globals.cpp $(EXTS) -o $(OUT)/RPGE_globals.o
 
 math: globals
-	@echo Compiling math.cpp ...
-	g++ -c source/math.cpp $(EXTS) -o $(OUT)/math.o
+	@echo Compiling math ...
+	g++ -c source/RPGE_math.cpp $(EXTS) -o $(OUT)/RPGE_math.o
 
 scene: globals math texture
-	@echo Compiling scene.cpp ...
-	g++ -c source/scene.cpp $(EXTS) -o $(OUT)/scene.o
+	@echo Compiling scene ...
+	g++ -c source/RPGE_scene.cpp $(EXTS) -o $(OUT)/RPGE_scene.o
 
 texture: globals
-	@echo Compiling texture.cpp ...
-	g++ -c source/texture.cpp $(EXTS) -o $(OUT)/texture.o
+	@echo Compiling texture ...
+	g++ -c source/RPGE_texture.cpp $(EXTS) -o $(OUT)/RPGE_texture.o
 
 clean:
 	# Output directory gets cleaned if it is not empty and does not point the root directory

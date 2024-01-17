@@ -1,8 +1,8 @@
 
 #include <iostream>
-#include "include/engine.hpp"
+#include <RPGE_engine.hpp>
 
-using namespace rp;
+using namespace rpge;
 
 struct Player {
     float moveSpeed;

@@ -1,12 +1,12 @@
 
-#ifndef _RP_MATH_HPP
-#define _RP_MATH_HPP 
+#ifndef _RPGE_MATH_HPP
+#define _RPGE_MATH_HPP 
 
 #include <cmath>
 #include <vector>
-#include "globals.hpp"
+#include "RPGE_globals.hpp"
 
-namespace rp {
+namespace rpge {
     using ::std::abs;
     using ::std::sqrt;
 

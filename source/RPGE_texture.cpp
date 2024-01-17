@@ -1,7 +1,7 @@
 
-#include "../include/texture.hpp"
+#include <RPGE_texture.hpp>
 
-namespace rp {
+namespace rpge {
 
     /************************************/
     /********** CLASS: TEXTURE **********/

@@ -1,17 +1,17 @@
 
-#ifndef _RP_SCENE_HPP
-#define _RP_SCENE_HPP
+#ifndef _RPGE_SCENE_HPP
+#define _RPGE_SCENE_HPP
 
 #include <fstream>
 #include <map>
 #include <string>
 #include <vector>
 #include <SDL2/SDL_pixels.h>
-#include "globals.hpp"
-#include "math.hpp"
-#include "texture.hpp"
+#include "RPGE_globals.hpp"
+#include "RPGE_math.hpp"
+#include "RPGE_texture.hpp"
 
-namespace rp {
+namespace rpge {
     using ::std::map;
     using ::std::vector;
     using ::std::string;
@@ -48,7 +48,7 @@ namespace rp {
      * a scene from file or create it manually. You can also modify scene properties at runtime to
      * give it a little bit of life.
      * 
-     * RP Scene consists of tile IDs (positive numbers) table with `width` columns and `height` rows,
+     * RP Scene consists of tile IDs (non-negative numbers) table with `width` columns and `height` rows,
      * each tile ID represents own set of walls, so you can think of them as looks blueprint for every
      * occurrence of that ID. Walls information is stored in structure called `WallData`.
      */
@@ -82,7 +82,7 @@ namespace rp {
             Scene(const SDL_PixelFormat* colorFormat, const string& rpsFile);
             ~Scene();
 
-            /* Returns if point ( `x`, `y` ) is included in the scene bounds */
+            /* Returns if tile location ( `x`, `y` ) is included in the scene bounds */
             bool checkPosition(int x, int y) const;
             
 	    /* Sets ID of a tile localized at ( `x`, `y` ) to `tileId`, returns whether operation was

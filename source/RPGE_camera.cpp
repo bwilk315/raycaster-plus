@@ -1,7 +1,7 @@
 
-#include "../include/camera.hpp"
+#include <RPGE_camera.hpp>
 
-namespace rp {
+namespace rpge {
     const float Camera::DIR_BIAS = 0.0001f;
     const float Camera::MIN_FOV = 0.01f;
     const float Camera::MAX_FOV = M_PI - 0.01f;

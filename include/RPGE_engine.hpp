@@ -1,19 +1,19 @@
 
-#ifndef _RP_ENGINE_HPP
-#define _RP_ENGINE_HPP
+#ifndef _RPGE_ENGINE_HPP
+#define _RPGE_ENGINE_HPP
 
 #include <chrono>
 #include <cmath>
 #include <map>
 #include <SDL2/SDL.h>
-#include "camera.hpp"
-#include "dda.hpp"
-#include "globals.hpp"
-#include "math.hpp"
-#include "scene.hpp"
-#include "texture.hpp"
+#include "RPGE_camera.hpp"
+#include "RPGE_dda.hpp"
+#include "RPGE_globals.hpp"
+#include "RPGE_math.hpp"
+#include "RPGE_scene.hpp"
+#include "RPGE_texture.hpp"
 
-namespace rp {
+namespace rpge {
     using ::std::chrono::time_point;
     using ::std::chrono::system_clock;
     using ::std::chrono::duration;

@@ -1,11 +1,11 @@
 
-#ifndef _RP_CAMERA_HPP
-#define _RP_CAMERA_HPP
+#ifndef _RPGE_CAMERA_HPP
+#define _RPGE_CAMERA_HPP
 
-#include "globals.hpp"
-#include "math.hpp"
+#include "RPGE_globals.hpp"
+#include "RPGE_math.hpp"
 
-namespace rp {
+namespace rpge {
     using ::std::abs;
 
     /**

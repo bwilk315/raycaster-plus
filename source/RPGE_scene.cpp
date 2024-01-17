@@ -1,7 +1,7 @@
 
-#include "../include/scene.hpp"
+#include <RPGE_scene.hpp>
 
-namespace rp {
+namespace rpge {
 
     /******************************************/
     /********** STRUCTURE: WALL DATA **********/

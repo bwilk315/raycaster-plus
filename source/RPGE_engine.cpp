@@ -1,7 +1,7 @@
 
-#include "../include/engine.hpp"
+#include <RPGE_engine.hpp>
 
-namespace rp {    
+namespace rpge {    
 
     /*************************************************/
     /********** STRUCTURE: COLUMN DRAW INFO **********/

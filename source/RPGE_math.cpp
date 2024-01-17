@@ -1,7 +1,7 @@
 
-#include "../include/math.hpp"
+#include <RPGE_math.hpp>
 
-namespace rp {
+namespace rpge {
     
     const float SQRT2 = 1.41421356f;
     const float INV_SQRT2 = 0.70710678f;

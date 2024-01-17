@@ -1,13 +1,13 @@
 
-#ifndef _RP_TEXTURE_HPP
-#define _RP_TEXTURE_HPP
+#ifndef _RPGE_TEXTURE_HPP
+#define _RPGE_TEXTURE_HPP
 
 #include <string>
 #include <png.h>
 #include <SDL2/SDL_pixels.h>
-#include "globals.hpp"
+#include "RPGE_globals.hpp"
 
-namespace rp {
+namespace rpge {
     using ::std::string;
 
     /**

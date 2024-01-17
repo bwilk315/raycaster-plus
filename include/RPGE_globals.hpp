@@ -4,8 +4,8 @@
  * therefore not really belonging to any of them.
  */
 
-#ifndef _RP_GLOBALS_HPP
-#define _RP_GLOBALS_HPP
+#ifndef _RPGE_GLOBALS_HPP
+#define _RPGE_GLOBALS_HPP
 
 #ifdef DEBUG
 #include <iostream>
@@ -13,7 +13,7 @@
 #include <sstream>
 #include <string>
 
-namespace rp {
+namespace rpge {
     #ifdef DEBUG
     using ::std::cout;
     using ::std::endl;
