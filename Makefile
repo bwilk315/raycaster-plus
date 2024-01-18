@@ -5,14 +5,14 @@
 #
 # This makefile works very primitively, I mean that it compiles the sources to object files,
 # and then merges them into one library with dependency libraries' object files, similar situation
-# occurrs to header files.
+# occurrs to header files, oh and it builds it in DEBUG mode - it is going to change later on.
 #
 
 OUT    = $(out)
 LIBZ   = -I$(libz)/include -L$(libz)/lib -lz
 LIBPNG = -I$(libpng)/include -L$(libpng)/lib -lpng
 LIBSDL = -I$(libsdl)/include -L$(libsdl)/lib -lSDL2
-EXTS   = -I$(shell pwd)/include $(LIBZ) $(LIBPNG) $(LIBSDL)
+EXTS   = -DDEBUG -I$(shell pwd)/include $(LIBZ) $(LIBPNG) $(LIBSDL)
 
 all: clean camera dda engine globals math scene texture
 	@echo Creating library archive file ...

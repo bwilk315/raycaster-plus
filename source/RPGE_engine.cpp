@@ -250,6 +250,9 @@ namespace rpge {
         int column = bRedraw ? rRenderArea.x : (rRenderArea.x + rRenderArea.w);
 
         // Draw the current frame, which consists of pixel columns
+        #ifdef DEBUG
+        bool centerDebugDone = false;
+        #endif
         for( ; column < (rRenderArea.x + rRenderArea.w); column += iColumnsPerRay) {
 
             // Position of the ray on the camera plane, from -1 (left) to 1 (right)
@@ -267,11 +270,11 @@ namespace rpge {
             // Vector of pairs indicating draw height exclusions as global pixel coordinate (key: start, value: end)
             vector<pair<int, int>> drawExcls;
 
-            #ifdef DEBUG
-            if(column == iScreenWidth/2) {
-                system("clear");
-            }
-            #endif
+            // #ifdef DEBUG
+            // if(column == iScreenWidth/2) {
+            //     system("clear");
+            // }
+            // #endif
 
             while(keepWalking) {
                 if(walker->rayFlag == DDA::RF_FAIL)
@@ -354,7 +357,6 @@ namespace rpge {
                         }
                     }
                 }
-
                 for(int i = 0; i != dipLen; i++) {
                     ColumnDrawInfo* cdi = drawInfoPtrs[i];
 
@@ -388,8 +390,11 @@ namespace rpge {
                         planeHorizontal = 1 - planeHorizontal;
 
                     // Draw column using drawable information
+                    int exclCount = drawExcls.empty() ? 0 : drawExcls.size();
                     int dbStart = clamp(drawStart, rhStart, rhEnd);
                     int dbEnd   = clamp(drawEnd - startClip, rhStart, rhEnd);
+
+                    // 
 
                     for(int h = dbStart; h < dbEnd; h += iRowsInterval) {
 
@@ -414,50 +419,113 @@ namespace rpge {
 
                         // Draw pixel to the buffer
                         uint32_t color = SDL_MapRGB(sdlSurface->format, tr, tg, tb);
-                        for(int c = 0; c != iColumnsPerRay; c++)
-                            for(int r = 0; r != iRowsInterval; r++)
-                                pixels[c + column + (h + r) * sdlSurface->w] = color;
+                        for(int c = 0; c != iColumnsPerRay; c++) {
+                            int hor = c + column;
+                            if(hor < 0 || hor >= sdlSurface->w)
+                                break;
+                            for(int r = 0; r != iRowsInterval; r++) {
+                                int ver = h + r - 1;
+                                if(ver < 0 || ver >= sdlSurface->h)
+                                    break;
 
+                                // #ifdef DEBUG 
+                                // if(column == iScreenWidth / 2) {
+                                //     cout << hor << ", " << ver << " | ";
+                                // }
+                                // #endif
+                                pixels[hor + ver * sdlSurface->w] = color;
+                            }
+                        }
                     }
 
-                    drawExcls.push_back(make_pair(dbStart, dbEnd));
+                    // Check whether new exclusion can be merged with other one(s), if yes then do that
+                    bool append = false;
+                    for(int e = 0; e < exclCount; e++) {
+                        pair<int, int>& excl = drawExcls.at(e);
+
+                        if(dbStart >= excl.first && dbEnd <= excl.second) {
+                            // Start and End are inside exclusion
+                            // Do nothing.
+                        } else if(dbStart >= excl.first && dbStart <= excl.second) {
+                            // Only Start is inside
+                            // Lengthten the exclusion in the bottom direction
+                            excl.second = dbEnd;
+                            e = 0;
+                        } else if(dbEnd >= excl.first && dbStart <= excl.second) {
+                            // Only End is inside
+                            // Lengthen the exclusion in the top direction
+                            excl.first = dbStart;
+                            e = 0;
+                        } else {
+                            // Neither Start nor End is inside
+                            // Append it as new unique exclusion
+                            append = true;
+                            break;
+                        }
+                    }
+                    if(append || exclCount == 0) {
+                        drawExcls.push_back(make_pair(dbStart, dbEnd));
+                    }
 
                     SDL_UnlockSurface(sdlSurface);
 
-                    delete cdi;
-                    if(cdi->wallDataPtr->stopsRay) {
+                    if(cdi->wallDataPtr->stopsRay)
                         keepWalking = false;
+
+                    delete cdi;
+
+                    if(!keepWalking)
                         break;
-                    }
                 }
             }
 
             #ifdef DEBUG
+            /* DRAW START AND END COORDINATE POINTS OVER THE CURRENT COLUMN, WHICH IN CONTINOUS COLUMNS DRAWING
+             * WILL RESULT IN DRAW START(GREEN)/END(RED) LINES */
 
             SDL_UnlockSurface(sdlSurface);
             int exclCount = drawExcls.empty() ? 0 : drawExcls.size();
             for(int e = 0; e < exclCount; e++) {
-                auto range = drawExcls.at(e);
-
-                // if(column == iScreenWidth/2) {
-                //     cout << "At " << e << ": From " << range.first << " to " << range.second << endl;
-                // }
+                const pair<int, int>& range = drawExcls.at(e);
 
                 // This draws line ranges
                 for(int c = 0; c < iColumnsPerRay; c++) {
+                    int hor = c + column;
+                    if(hor < 0 || hor >= sdlSurface->w)
+                        break;
                     for(int r = 0; r < iRowsInterval; r++) {
-                        pixels[c + column + (range.first + r) * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 0, 255, 0);
-                        pixels[c + column + (range.second + r) * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 255, 0, 0);
+
+                        int verS = range.first + r - 1;
+                        if(verS < 0 || verS >= sdlSurface->h)
+                            break;
+                        pixels[hor + verS * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 0, 255, 0);
+
+                        int verE = range.second + r - 1;
+                        if(verE < 0 || verE >= sdlSurface->h)
+                            break;
+                        pixels[hor + verE * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 255, 0, 0);
+
                     }
                 }
             }
             SDL_LockSurface(sdlSurface);
+
             #endif
 
             #ifdef DEBUG
-            if(abs(column - iScreenWidth / 2) <= iColumnsPerRay) {
+            /* DRAW CENTRAL VERTICAL LINE, IT IS KINDA BUGGED FOR NOW */
+
+            if(!centerDebugDone && abs(column - iScreenWidth / 2) <= iColumnsPerRay) {
+                
+                system("clear");
+                for(const auto& sus : drawExcls) {
+                    cout << "Start " << sus.first << ", End " << sus.second << endl;
+                }
+
                 for(int i = rRenderArea.y; i < rRenderArea.h + rRenderArea.y; i++)
                     pixels[iScreenWidth / 2 + i * sdlSurface->w] = 0xffffff;
+
+                centerDebugDone = true;
             }
             #endif
         }
