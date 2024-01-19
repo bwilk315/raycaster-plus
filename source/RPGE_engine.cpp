@@ -270,11 +270,11 @@ namespace rpge {
             // Vector of pairs indicating draw height exclusions as global pixel coordinate (key: start, value: end)
             vector<pair<int, int>> drawExcls;
 
-            // #ifdef DEBUG
-            // if(column == iScreenWidth/2) {
-            //     system("clear");
-            // }
-            // #endif
+            #ifdef DEBUG ///////////////////////////////////////////
+            if(column == iScreenWidth/2) {
+                system("clear");
+            }
+            #endif
 
             while(keepWalking) {
                 if(walker->rayFlag == DDA::RF_FAIL)
@@ -394,80 +394,121 @@ namespace rpge {
                     int dbStart = clamp(drawStart, rhStart, rhEnd);
                     int dbEnd   = clamp(drawEnd - startClip, rhStart, rhEnd);
 
-                    // 
-
-                    for(int h = dbStart; h < dbEnd; h += iRowsInterval) {
-
-                        // Obtain a current pixel color
-                        uint8_t tr, tg, tb, ta;
-                        if(isSolidColor) {
-                            SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurface->format, &tr, &tg, &tb, &ta);
+                    // Find  out jumping information
+                    map<int, int> exclJumps; // insane but works
+                    bool isVisible = true;
+                    for(int e = 0; e < exclCount; e++) {
+                        const pair<int, int>& excl = drawExcls.at(e);
+                        bool inclStart = excl.first  >= dbStart && excl.first  <= dbEnd;
+                        bool inclEnd   = excl.second >= dbStart && excl.second <= dbEnd;
+                        if(inclStart && inclEnd) {
+                            // Exclusion is included in drawing range
+                            exclJumps.insert(make_pair(excl.first, excl.second));
+                        } else if(inclStart) {
+                            // Only start is included
+                            dbEnd = excl.first;
+                        } else if(inclEnd) {
+                            // Only end is included
+                            dbStart = excl.second;
+                        } else if(excl.first <= dbStart && excl.second >= dbEnd) {
+                            // Exclusion eats the whole drawing range
+                            isVisible = false;
+                            break;
                         } else {
-                            float planeVertical = 1.0f - (h - drawStart) / (float)totalHeight;
-                            SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical), sdlSurface->format, &tr, &tg, &tb, &ta);
+                            // Exclusion is not touching the drawing range at all
                         }
-
-                        // Apply lightning to the color
-                        if(bLightEnabled) {
-                            const float minBn = 0.2f;
-                            float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
-                            float bn = minBn + (1 - minBn) * perc; // Final brightness
-                            tr *= bn;
-                            tg *= bn;
-                            tb *= bn;
+                    }
+                    
+                    if(isVisible) {
+                        #ifdef DEBUG ///////////////////////////////////////////
+                        if(column == iScreenWidth / 2) {
                         }
+                        #endif
 
-                        // Draw pixel to the buffer
-                        uint32_t color = SDL_MapRGB(sdlSurface->format, tr, tg, tb);
-                        for(int c = 0; c != iColumnsPerRay; c++) {
-                            int hor = c + column;
-                            if(hor < 0 || hor >= sdlSurface->w)
-                                break;
-                            for(int r = 0; r != iRowsInterval; r++) {
-                                int ver = h + r - 1;
-                                if(ver < 0 || ver >= sdlSurface->h)
+                        for(int h = dbStart; h < dbEnd; h += iRowsInterval) {
+
+                            // THIS IS CRAZY APPROACH BUT IT WORKS, IT MUST BE OPTIMIZED
+                            // Perform jumping if neccessary
+                            for(int omg = 0; omg < iRowsInterval; omg++) {
+                                if(exclJumps.count(h + omg) != 0) {
+                                    h = exclJumps[h + omg];
+                                }
+                            }
+
+                            // Obtain a current pixel color
+                            uint8_t tr, tg, tb, ta;
+                            if(isSolidColor) {
+                                SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurface->format, &tr, &tg, &tb, &ta);
+                            } else {
+                                float planeVertical = 1.0f - (h - drawStart) / (float)totalHeight;
+                                SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical), sdlSurface->format, &tr, &tg, &tb, &ta);
+                            }
+
+                            // Apply lightning to the color
+                            if(bLightEnabled) {
+                                const float minBn = 0.2f;
+                                float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
+                                float bn = minBn + (1 - minBn) * perc; // Final brightness
+                                tr *= bn;
+                                tg *= bn;
+                                tb *= bn;
+                            }
+
+                            // Draw pixel to the buffer
+                            uint32_t color = SDL_MapRGB(sdlSurface->format, tr, tg, tb);
+                            for(int c = 0; c != iColumnsPerRay; c++) {
+                                int hor = c + column;
+                                if(hor < 0 || hor >= sdlSurface->w)
                                     break;
-
-                                // #ifdef DEBUG 
-                                // if(column == iScreenWidth / 2) {
-                                //     cout << hor << ", " << ver << " | ";
-                                // }
-                                // #endif
-                                pixels[hor + ver * sdlSurface->w] = color;
+                                for(int r = 0; r != iRowsInterval; r++) {
+                                    int ver = h + r - 1;
+                                    if(ver < 0 || ver >= sdlSurface->h)
+                                        break;
+                                    
+                                    pixels[hor + ver * sdlSurface->w] = color;
+                                }
                             }
                         }
-                    }
 
-                    // Check whether new exclusion can be merged with other one(s), if yes then do that
-                    bool append = false;
-                    for(int e = 0; e < exclCount; e++) {
-                        pair<int, int>& excl = drawExcls.at(e);
+                        // Check whether new exclusion can be merged with other one(s), if yes then do that
+                        bool append = false;
+                        for(int e = 0; e < exclCount; e++) {
+                            pair<int, int>& excl = drawExcls.at(e);
 
-                        if(dbStart >= excl.first && dbEnd <= excl.second) {
-                            // Start and End are inside exclusion
-                            // Do nothing.
-                        } else if(dbStart >= excl.first && dbStart <= excl.second) {
-                            // Only Start is inside
-                            // Lengthten the exclusion in the bottom direction
-                            excl.second = dbEnd;
-                            e = 0;
-                        } else if(dbEnd >= excl.first && dbStart <= excl.second) {
-                            // Only End is inside
-                            // Lengthen the exclusion in the top direction
-                            excl.first = dbStart;
-                            e = 0;
-                        } else {
-                            // Neither Start nor End is inside
-                            // Append it as new unique exclusion
-                            append = true;
-                            break;
+                            if(dbStart >= excl.first && dbStart <= excl.second) {
+                                // Only Start is inside
+                                // Lengthten the exclusion in the bottom direction
+                                append = false;
+                                if(dbEnd > excl.second) {
+                                    excl.second = dbEnd;
+                                    e = 0;
+                                } else {
+                                    break;
+                                }
+                            } else if(dbEnd >= excl.first && dbEnd <= excl.second) {
+                                // Only End is inside
+                                // Lengthen the exclusion in the top direction
+                                append = false;
+                                if(dbStart < excl.first) {
+                                    excl.first = dbStart;
+                                    e = 0;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                // Neither Start nor End is inside
+                                // Append it as new unique exclusion
+                                append = true;
+                            }
                         }
-                    }
-                    if(append || exclCount == 0) {
-                        drawExcls.push_back(make_pair(dbStart, dbEnd));
-                    }
+                        if(append || exclCount == 0) {
+                            drawExcls.push_back(make_pair(dbStart, dbEnd));
+                            exclCount++;
+                        }
 
-                    SDL_UnlockSurface(sdlSurface);
+                        SDL_UnlockSurface(sdlSurface);
+
+                    }
 
                     if(cdi->wallDataPtr->stopsRay)
                         keepWalking = false;
@@ -482,9 +523,9 @@ namespace rpge {
             #ifdef DEBUG
             /* DRAW START AND END COORDINATE POINTS OVER THE CURRENT COLUMN, WHICH IN CONTINOUS COLUMNS DRAWING
              * WILL RESULT IN DRAW START(GREEN)/END(RED) LINES */
+            int exclCount = drawExcls.empty() ? 0 : drawExcls.size();
 
             SDL_UnlockSurface(sdlSurface);
-            int exclCount = drawExcls.empty() ? 0 : drawExcls.size();
             for(int e = 0; e < exclCount; e++) {
                 const pair<int, int>& range = drawExcls.at(e);
 
@@ -517,10 +558,10 @@ namespace rpge {
 
             if(!centerDebugDone && abs(column - iScreenWidth / 2) <= iColumnsPerRay) {
                 
-                system("clear");
-                for(const auto& sus : drawExcls) {
-                    cout << "Start " << sus.first << ", End " << sus.second << endl;
-                }
+                // system("clear");
+                // for(const auto& sus : drawExcls) {
+                //     cout << "Start " << sus.first << ", End " << sus.second << endl;
+                // }
 
                 for(int i = rRenderArea.y; i < rRenderArea.h + rRenderArea.y; i++)
                     pixels[iScreenWidth / 2 + i * sdlSurface->w] = 0xffffff;

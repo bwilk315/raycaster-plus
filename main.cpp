@@ -29,8 +29,8 @@ int main() {
     engine.setLightBehavior (true, 0);
     engine.setMainCamera    (&player.camera);
     engine.setRenderFitMode (RenderFitMode::SQUARE);
-    engine.setColumnsPerRay (2);
-    engine.setRowsInterval  (2);
+    engine.setColumnsPerRay (4);
+    engine.setRowsInterval  (4);
     engine.getWalker()->setTargetScene(&scene);
     engine.getWalker()->setMaxTileDistance(21);
     
@@ -49,6 +49,25 @@ int main() {
         }
         if(engine.getKeyState(SDL_SCANCODE_ESCAPE) == KeyState::UP) {
             engine.stop();
+        }
+
+        // Fake vertical movement
+        float vChange = 0.0f;
+        if(engine.getKeyState(SDL_SCANCODE_E) == KeyState::PRESS) vChange -= engine.getElapsedTime();
+        if(engine.getKeyState(SDL_SCANCODE_Q) == KeyState::PRESS) vChange += engine.getElapsedTime();
+        if(vChange != 0) {
+            for(const int& tid : *scene.getTileIds()) {
+                const vector<WallData>* data = scene.getTileWalls(tid);
+                if(data->empty())
+                    break;
+                for(int wi = 0; wi < data->size(); wi++) {
+                    WallData wd = data->at(wi);
+                    wd.hMin += vChange;
+                    wd.hMax += vChange;
+                    scene.setTileWall(tid, wi, wd);
+                }
+            }
+            isTransforming = true;
         }
 
         // Camera movement

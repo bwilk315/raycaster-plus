@@ -12,7 +12,7 @@ OUT    = $(out)
 LIBZ   = -I$(libz)/include -L$(libz)/lib -lz
 LIBPNG = -I$(libpng)/include -L$(libpng)/lib -lpng
 LIBSDL = -I$(libsdl)/include -L$(libsdl)/lib -lSDL2
-EXTS   = -DDEBUG -I$(shell pwd)/include $(LIBZ) $(LIBPNG) $(LIBSDL)
+EXTS   = -I$(shell pwd)/include $(LIBZ) $(LIBPNG) $(LIBSDL)
 
 all: clean camera dda engine globals math scene texture
 	@echo Creating library archive file ...
