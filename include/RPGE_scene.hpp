@@ -39,9 +39,6 @@ namespace rpge {
         WallData(const LinearFunc& func, const uint32_t& tint, float hMin, float hMax, uint16_t texId, bool stopsRay);
 
         void updateMetrics();
-
-        /* Returns whether the current wall is placed below the other one */
-        bool operator<(const WallData& other) const;
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const WallData& wd);
@@ -87,55 +84,56 @@ namespace rpge {
             ~Scene();
 
             /* Returns if tile location ( `x`, `y` ) is included in the scene bounds */
-            bool checkPosition(int x, int y) const;
+            bool               checkPosition(int x, int y) const;
 
             /* Appends given wall definition `wd` to collection of walls for tile with ID `tileId`, returns wall
              * index assigned to the created wall that can be later used to obtain it back from vector returned
              * by `getTileWalls` method. */
-            int createTileWall(int tileId, const WallData& wd);
+            int                createTileWall(int tileId, const WallData& wd);
             
             /* Sets ID of a tile localized at ( `x`, `y` ) to `tileId`, returns whether operation was
             * successfull. This function does not override source file.  */
-            bool setTileId(int x, int y, int tileId);
+            bool               setTileId(int x, int y, int tileId);
                 
             /* Returns latest error code set by the class instance */
-            int getError() const;
+            int                getError() const;
                 
             /* Returns ID of a tile localized at ( `x`, `y` ) if possible, otherwise returns 0 */
-            int getTileId(int x, int y) const;
+            int                getTileId(int x, int y) const;
                 
             /* Returns width of the scene in tiles */
-            int getWidth() const;
+            int                getWidth() const;
 
             /* Returns height of the scene in tiles */
-            int getHeight() const;
+            int                getHeight() const;
 
             /* Returns array index of a texture with file name `rpsFile` if it is loaded, otherwise
             * returns 0. */
-            int getTextureId(const string& rpsFile) const;
+            int                getTextureId(const string& rpsFile) const;
             
             /* Returns file name of a texture with array index of `texId` if it is loaded, otherwise
             * returns empty string. */
-            string getTextureName(int texId) const;
+            string             getTextureName(int texId) const;
 
             /* Returns pointer to a `Texture` class instance that got loaded at `texId` array index
             * or using `rpsFile` file, otherwise returns null pointer. */
-            const Texture* getTextureSource(int texId) const;
-            const Texture* getTextureSource(const string& rpsFile) const;
+            const Texture*     getTextureSource(int texId) const;
+            const Texture*     getTextureSource(const string& rpsFile) const;
 
 	        /* Returns pointer to a vector holding all types of tile IDs */
             const vector<int>* getTileIds() const;
 
-	        /* Returns pointer to a vector filled with wall collection for tile with ID `tileId`. */
-            const vector<WallData>* getTileWalls(int tileId) const;
+	        /* Returns pointer to a vector filled with wall collection for tile with ID `tileId`.
+             * You really should not change vector structure, but feel free to edit its elements. */
+            vector<WallData>*  getTileWalls(int tileId);
 
 	        /* Loads texture from file `pngFile` to an array. Returns array index at which the texture was
 	         * loaded but incremented by one, if failed returns 0. */
-            int loadTexture(const string& pngFile);
+            int                loadTexture(const string& pngFile);
 
 	        /* Loads scene from RPS (Raycaster Plus Scene) file `file`, returns line at which interpretation
 	         * error occurred or the last line with error not set. */ 
-            int loadFromFile(const string& file);
+            int                loadFromFile(const string& file);
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Scene& scene);

@@ -44,7 +44,7 @@ namespace rpge {
             Vector2 start;                  // Cached ray starting point
             Vector2 direction;              // Cached ray stepping direction (normalized)
 
-            const Scene* scene;
+            Scene* scene;
 
         public:
             const float MAX_DD = 1e10f; // Maximum delta distance for both axes
@@ -60,28 +60,28 @@ namespace rpge {
             };
 
             DDA();
-            DDA(const Scene* scene);
-            DDA(const Scene* scene, int maxTileDist);
+            DDA(Scene* scene);
+            DDA(Scene* scene, int maxTileDist);
             
             /* Returns maximum tile distance the ray can reach */
-            float        getMaxTileDistance() const;
+            float      getMaxTileDistance() const;
 
             /* Returns a pointer to the target `Scene` class instance, on which DDA is performed */
-            const Scene* getTargetScene() const;
+            Scene*     getTargetScene();
 
             /* Prepares things that are necessary for performing continous ray-walking */
-            void         init(const Vector2& start, const Vector2& direction);
+            void       init(const Vector2& start, const Vector2& direction);
 
             /* Returns information about a next ray-tile collision only if tile ID is not equal zero,
              * otherwise returns empty information structure. Notice that this method controls `rayFlag`,
              * you should check it after every call. */
-            RayHitInfo   next();
+            RayHitInfo next();
 
             /* Sets the target scene, on which rays will be walking */
-            void         setTargetScene(const Scene* scene);
+            void       setTargetScene(Scene* scene);
 
             /* Sets maximum distance a ray can reach */
-            void         setMaxTileDistance(float distance);
+            void       setMaxTileDistance(float distance);
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const DDA& dda);

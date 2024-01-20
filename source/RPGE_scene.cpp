@@ -52,9 +52,6 @@ namespace rpge {
 
         length = (end - pivot).magnitude();
     }
-    bool WallData::operator<(const WallData& other) const {
-        return this->hMax <= other.hMin; 
-    }
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const WallData& wd) {
         stream << "WallData(func=" << wd.func << ", pivot=" << wd.pivot << ", length=" << wd.length;
@@ -102,23 +99,13 @@ namespace rpge {
     }
     int Scene::createTileWall(int tileId, const WallData& wd) {
         // Create tile entry if there is no one yet
-        if(tileWalls.count(tileId) == 0)
+        if(tileWalls.count(tileId) == 0) {
             tileWalls.insert(make_pair( tileId, vector<WallData>() ));
-        // Append new wall data sorted by height
-        vector<WallData>* vec = &tileWalls.at(tileId);
-        int size = vec->empty() ? 0 : vec->size();
-        bool appended = false;
-        int w = 0;
-        for(; w < size; w++) {
-            if(wd < vec->at(w)) {
-                vec->insert(vec->begin() + w, wd);
-                appended = true;
-                break;
-            }
+            tileIds.push_back(tileId);
         }
-        if(size == 0 || !appended)
-            vec->push_back(wd);
-        return w;
+        // Append new wall data, and return its index
+        tileWalls.at(tileId).push_back(wd);
+        return tileWalls.at(tileId).size() - 1;
     }
     bool Scene::setTileId(int x, int y, int tileId) {
         if(checkPosition(x, y)) {
@@ -165,7 +152,7 @@ namespace rpge {
     const vector<int>* Scene::getTileIds() const {
         return &tileIds;
     }
-    const vector<WallData>* Scene::getTileWalls(int tileId) const {
+    vector<WallData>* Scene::getTileWalls(int tileId) {
         if(tileWalls.count(tileId) == 0)
             return nullptr;
         return &tileWalls.at(tileId);

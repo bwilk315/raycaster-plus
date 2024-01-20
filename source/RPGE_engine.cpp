@@ -230,9 +230,9 @@ namespace rpge {
         // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
         // located at height of 1/2.
         const float pcmDist = 1 / (2 * tan(mainCamera->getFieldOfView() / 2));
-        const Scene* mainScene = walker->getTargetScene();
-        Vector2 camDir = mainCamera->getDirection();
-        Vector2 camPos = mainCamera->getPosition();
+        Scene* mainScene = walker->getTargetScene();
+        Vector2 camDir   = mainCamera->getDirection();
+        Vector2 camPos   = mainCamera->getPosition();
         Vector2 planeVec = mainCamera->getPlane();
 
         // Linear function describing the camera plane, it is later used for computing distances to intersection points
@@ -270,11 +270,13 @@ namespace rpge {
             // Vector of pairs indicating draw height exclusions as global pixel coordinate (key: start, value: end)
             vector<pair<int, int>> drawExcls;
 
-            #ifdef DEBUG ///////////////////////////////////////////
-            if(column == iScreenWidth/2) {
+
+            #ifdef DEBUG 
+            if(column == iScreenWidth / 2) {
                 system("clear");
             }
             #endif
+
 
             while(keepWalking) {
                 if(walker->rayFlag == DDA::RF_FAIL)
@@ -395,21 +397,35 @@ namespace rpge {
                     int dbEnd   = clamp(drawEnd - startClip, rhStart, rhEnd);
 
                     // Find  out jumping information
-                    map<int, int> exclJumps; // insane but works
+                    int jumpIndex = -1;
                     bool isVisible = true;
                     for(int e = 0; e < exclCount; e++) {
                         const pair<int, int>& excl = drawExcls.at(e);
-                        bool inclStart = excl.first  >= dbStart && excl.first  <= dbEnd;
-                        bool inclEnd   = excl.second >= dbStart && excl.second <= dbEnd;
+                        bool inclStart = excl.first  > dbStart && excl.first  < dbEnd;
+                        bool inclEnd   = excl.second > dbStart && excl.second < dbEnd;
+
                         if(inclStart && inclEnd) {
                             // Exclusion is included in drawing range
-                            exclJumps.insert(make_pair(excl.first, excl.second));
+                            if(jumpIndex == -1) {
+                                jumpIndex = e;
+
+
+                                #ifdef DEBUG 
+                                if(column == iScreenWidth / 2) {
+                                    cout << "Set jumpIndex! " << e << ": " << excl.first << ", " << excl.second << endl;
+                                }
+                                #endif
+
+
+                            }
                         } else if(inclStart) {
                             // Only start is included
                             dbEnd = excl.first;
+                            e = 0;
                         } else if(inclEnd) {
                             // Only end is included
                             dbStart = excl.second;
+                            e = 0;
                         } else if(excl.first <= dbStart && excl.second >= dbEnd) {
                             // Exclusion eats the whole drawing range
                             isVisible = false;
@@ -417,23 +433,65 @@ namespace rpge {
                         } else {
                             // Exclusion is not touching the drawing range at all
                         }
-                    }
-                    
-                    if(isVisible) {
-                        #ifdef DEBUG ///////////////////////////////////////////
+
+
+                        #ifdef DEBUG 
                         if(column == iScreenWidth / 2) {
+                            cout << "Iter " << e << ": " << jumpIndex << ", se: " << dbStart << ", " << dbEnd << endl;
                         }
                         #endif
 
-                        for(int h = dbStart; h < dbEnd; h += iRowsInterval) {
 
-                            // THIS IS CRAZY APPROACH BUT IT WORKS, IT MUST BE OPTIMIZED
+                    }
+
+
+                    #ifdef DEBUG 
+                    if(column == iScreenWidth / 2) {
+                        cout << "\n(  " << isVisible << "  ) Draw start/end: " << dbStart << ", " << dbEnd << ",,, dist = " << cdi->perpDist << endl;
+                    }
+                    #endif
+
+
+                    if(isVisible) {
+
+                        pair<int, int> jumpExcl = jumpIndex == -1 ? make_pair(-1, -1) : drawExcls.at(jumpIndex);
+                        for(int h = dbStart; h < dbEnd; h++) {
+
                             // Perform jumping if neccessary
-                            for(int omg = 0; omg < iRowsInterval; omg++) {
-                                if(exclJumps.count(h + omg) != 0) {
-                                    h = exclJumps[h + omg];
+                            if(h >= jumpExcl.first && h <= jumpExcl.second && jumpIndex != -1) {
+
+                                #ifdef DEBUG 
+                                if(column == iScreenWidth / 2) {
+                                    cout << "WallDist: " << cdi->perpDist << ", jump from " << h << " to " << jumpExcl.second << " .-. " << jumpIndex << ", (ec= " << exclCount << ")" << endl;
                                 }
+                                #endif
+
+                                // Find next jump exclusion, it must be under the current one
+                                h = jumpExcl.second;
+                                while(jumpExcl.second <= h) {
+                                    if(++jumpIndex < exclCount) {
+                                        jumpExcl = drawExcls.at(jumpIndex);
+                                    } else {
+                                        break;
+                                    }
+                                }
+
+                                //h  -= iRowsInterval; // it will be balanced in the next iteration
+                                continue;
+                            } else {
+
+                                
+                                #ifdef DEBUG 
+                                if(column == iScreenWidth / 2) {
+                                    cout << cdi->perpDist << ", " << h << " == no " << endl;
+                                }
+                                #endif
+
+
                             }
+
+                            if(h % iRowsInterval != 0)
+                                continue;
 
                             // Obtain a current pixel color
                             uint8_t tr, tg, tb, ta;
@@ -470,45 +528,32 @@ namespace rpge {
                             }
                         }
 
-                        // Check whether new exclusion can be merged with other one(s), if yes then do that
-                        bool append = false;
-                        for(int e = 0; e < exclCount; e++) {
-                            pair<int, int>& excl = drawExcls.at(e);
+                        SDL_UnlockSurface(sdlSurface);
 
-                            if(dbStart >= excl.first && dbStart <= excl.second) {
-                                // Only Start is inside
-                                // Lengthten the exclusion in the bottom direction
-                                append = false;
-                                if(dbEnd > excl.second) {
-                                    excl.second = dbEnd;
-                                    e = 0;
-                                } else {
+                        // Append new exclusion, do it so vector remains sorted according to exclusions' start coordinate
+                        if(dbStart != dbEnd) {
+                            int index = exclCount == 0 ? 0 : (exclCount);
+                            for(int e = 0; e < exclCount; e++) {
+                                if(dbStart <= drawExcls.at(e).first) {
+                                    index = e;
                                     break;
                                 }
-                            } else if(dbEnd >= excl.first && dbEnd <= excl.second) {
-                                // Only End is inside
-                                // Lengthen the exclusion in the top direction
-                                append = false;
-                                if(dbStart < excl.first) {
-                                    excl.first = dbStart;
-                                    e = 0;
-                                } else {
-                                    break;
-                                }
-                            } else {
-                                // Neither Start nor End is inside
-                                // Append it as new unique exclusion
-                                append = true;
                             }
-                        }
-                        if(append || exclCount == 0) {
-                            drawExcls.push_back(make_pair(dbStart, dbEnd));
+                            drawExcls.insert(drawExcls.begin() + index, make_pair(dbStart, dbEnd));
                             exclCount++;
                         }
 
-                        SDL_UnlockSurface(sdlSurface);
-
                     }
+
+
+                    #ifdef DEBUG 
+                    if(column == iScreenWidth / 2) {
+                        for(auto sus: drawExcls)
+                            cout << sus.first << ", " << sus.second << endl;
+                        cout << endl;
+                    }
+                    #endif
+
 
                     if(cdi->wallDataPtr->stopsRay)
                         keepWalking = false;
@@ -544,25 +589,19 @@ namespace rpge {
                         int verE = range.second + r - 1;
                         if(verE < 0 || verE >= sdlSurface->h)
                             break;
-                        pixels[hor + verE * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 255, 0, 0);
+                        pixels[hor + verE * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 0, 255, 0);
 
                     }
                 }
             }
             SDL_LockSurface(sdlSurface);
 
-            #endif
-
-            #ifdef DEBUG
             /* DRAW CENTRAL VERTICAL LINE, IT IS KINDA BUGGED FOR NOW */
 
             if(!centerDebugDone && abs(column - iScreenWidth / 2) <= iColumnsPerRay) {
-                
                 // system("clear");
-                // for(const auto& sus : drawExcls) {
-                //     cout << "Start " << sus.first << ", End " << sus.second << endl;
-                // }
-
+                // for(auto sus : drawExcls)
+                //     cout << sus.first << ", " << sus.second << endl;
                 for(int i = rRenderArea.y; i < rRenderArea.h + rRenderArea.y; i++)
                     pixels[iScreenWidth / 2 + i * sdlSurface->w] = 0xffffff;
 

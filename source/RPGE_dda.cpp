@@ -33,13 +33,13 @@ namespace rpge {
         this->maxTileDist = 0;
         this->scene = nullptr;
     }
-    DDA::DDA(const Scene* scene) : DDA() {
+    DDA::DDA(Scene* scene) : DDA() {
         setTargetScene(scene);
     }
-    DDA::DDA(const Scene* scene, int maxTileDist) : DDA(scene) {
+    DDA::DDA(Scene* scene, int maxTileDist) : DDA(scene) {
         setMaxTileDistance(maxTileDist);
     }
-    void DDA::setTargetScene(const Scene* scene) {
+    void DDA::setTargetScene(Scene* scene) {
         this->scene = scene;
     }
     void DDA::setMaxTileDistance(float distance) {
@@ -48,7 +48,7 @@ namespace rpge {
     float DDA::getMaxTileDistance() const {
         return maxTileDist;
     }
-    const Scene* DDA::getTargetScene() const {
+    Scene* DDA::getTargetScene() {
         return scene;
     }
     void DDA::init(const Vector2& start, const Vector2& direction) {
@@ -133,9 +133,9 @@ namespace rpge {
         return RayHitInfo();
     }
     #ifdef DEBUG
-    ostream& operator<<(ostream& stream, const DDA& dda) {
-        stream << "DDA(rayFlag=" << dda.rayFlag << ", maxTileDist=" << dda.getMaxTileDistance() << ", scene=";
-        stream << dda.getTargetScene() << ")";
+    ostream& operator<<(ostream& stream, DDA& dda) {
+        stream << "DDA(rayFlag=" << dda.rayFlag << ", maxTileDist=" << dda.getMaxTileDistance();
+        stream << ", scene=" << *dda.getTargetScene() << ")";
         return stream;
     }
     #endif
