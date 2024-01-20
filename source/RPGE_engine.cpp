@@ -230,7 +230,7 @@ namespace rpge {
         // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
         // located at height of 1/2.
         const float pcmDist = 1 / (2 * tan(mainCamera->getFieldOfView() / 2));
-        const Scene* const mainScene = walker->getTargetScene();
+        const Scene* mainScene = walker->getTargetScene();
         Vector2 camDir = mainCamera->getDirection();
         Vector2 camPos = mainCamera->getPosition();
         Vector2 planeVec = mainCamera->getPlane();

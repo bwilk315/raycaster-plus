@@ -52,6 +52,9 @@ namespace rpge {
 
         length = (end - pivot).magnitude();
     }
+    bool WallData::operator<(const WallData& other) const {
+        return this->hMax <= other.hMin; 
+    }
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const WallData& wd) {
         stream << "WallData(func=" << wd.func << ", pivot=" << wd.pivot << ", length=" << wd.length;
@@ -96,6 +99,26 @@ namespace rpge {
     }
     bool Scene::checkPosition(int x, int y) const {
         return (x > -1 && x < width) && (y > -1 && y < height);
+    }
+    int Scene::createTileWall(int tileId, const WallData& wd) {
+        // Create tile entry if there is no one yet
+        if(tileWalls.count(tileId) == 0)
+            tileWalls.insert(make_pair( tileId, vector<WallData>() ));
+        // Append new wall data sorted by height
+        vector<WallData>* vec = &tileWalls.at(tileId);
+        int size = vec->empty() ? 0 : vec->size();
+        bool appended = false;
+        int w = 0;
+        for(; w < size; w++) {
+            if(wd < vec->at(w)) {
+                vec->insert(vec->begin() + w, wd);
+                appended = true;
+                break;
+            }
+        }
+        if(size == 0 || !appended)
+            vec->push_back(wd);
+        return w;
     }
     bool Scene::setTileId(int x, int y, int tileId) {
         if(checkPosition(x, y)) {
@@ -146,20 +169,6 @@ namespace rpge {
         if(tileWalls.count(tileId) == 0)
             return nullptr;
         return &tileWalls.at(tileId);
-    }
-    int Scene::setTileWall(int tileId, int wallIndex, const WallData& newData) {
-        if(tileWalls.count(tileId) == 0) {
-            tileIds.push_back(tileId);
-            tileWalls.insert(pair<int, vector<WallData>>(tileId, vector<WallData>()));
-        }
-        // Add new wall details entry if needed, index of influenced wall is returned
-        int wallsCount = tileWalls.at(tileId).empty() ? 0 : tileWalls.at(tileId).size();
-        if(wallIndex < 0 || wallIndex > wallsCount - 1) {
-            wallIndex = wallsCount; // Force the proper wall index
-            tileWalls.at(tileId).push_back(WallData());
-        }
-        tileWalls.at(tileId).at(wallIndex) = newData;
-        return wallIndex;
     }
     int Scene::loadTexture(const string& pngFile) {
         if(texIds.count(pngFile) != 0)
@@ -276,9 +285,8 @@ namespace rpge {
                     string textureFile = text.substr(1, tLen - 2); // Without double apostrophes
                     int assignedId = loadTexture(textureFile);
 
-                    setTileWall(
+                    createTileWall(
                         (int)stof(args.at(1)),
-                        -1, // Enforce new wall entry creation (to not override existing ones)
                         WallData(
                             LinearFunc(
                                 stof(args.at(3)),

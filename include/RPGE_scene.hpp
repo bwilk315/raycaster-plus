@@ -18,6 +18,7 @@ namespace rpge {
     using ::std::pair;
     using ::std::ifstream;
     using ::std::abs;
+    using ::std::make_pair;
     using ::std::stof;
 
     /**
@@ -38,6 +39,9 @@ namespace rpge {
         WallData(const LinearFunc& func, const uint32_t& tint, float hMin, float hMax, uint16_t texId, bool stopsRay);
 
         void updateMetrics();
+
+        /* Returns whether the current wall is placed below the other one */
+        bool operator<(const WallData& other) const;
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const WallData& wd);
@@ -84,7 +88,12 @@ namespace rpge {
 
             /* Returns if tile location ( `x`, `y` ) is included in the scene bounds */
             bool checkPosition(int x, int y) const;
-                
+
+            /* Appends given wall definition `wd` to collection of walls for tile with ID `tileId`, returns wall
+             * index assigned to the created wall that can be later used to obtain it back from vector returned
+             * by `getTileWalls` method. */
+            int createTileWall(int tileId, const WallData& wd);
+            
             /* Sets ID of a tile localized at ( `x`, `y` ) to `tileId`, returns whether operation was
             * successfull. This function does not override source file.  */
             bool setTileId(int x, int y, int tileId);
@@ -117,14 +126,8 @@ namespace rpge {
 	        /* Returns pointer to a vector holding all types of tile IDs */
             const vector<int>* getTileIds() const;
 
-	        /* Returns pointer to a vector filled with information about every wall defined for the specified
-	         * tile ID `tileId`, returns null pointer on fail. */
+	        /* Returns pointer to a vector filled with wall collection for tile with ID `tileId`. */
             const vector<WallData>* getTileWalls(int tileId) const;
-
-	        /* Appends new or edits existing data of a wall at array index `wallIndex` of tiles with ID
-	         * of `tileId`. Returns array index of an edited wall, it may not always be `wallIndex`, like
-	         * when wall does not exists and new one must be created. */
-            int setTileWall(int tileId, int wallIndex, const WallData& newData);
 
 	        /* Loads texture from file `pngFile` to an array. Returns array index at which the texture was
 	         * loaded but incremented by one, if failed returns 0. */
