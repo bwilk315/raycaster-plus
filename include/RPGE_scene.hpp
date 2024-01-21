@@ -123,8 +123,9 @@ namespace rpge {
 	        /* Returns pointer to a vector holding all types of tile IDs */
             const vector<int>* getTileIds() const;
 
-	        /* Returns pointer to a vector filled with wall collection for tile with ID `tileId`.
-             * You really should not change vector structure, but feel free to edit its elements. */
+	        /* Returns pointer to a vector filled with wall definitions for tile with ID `tileId`, or null
+             * pointer if there are no walls defined. You really should not change vector structure, but feel
+             * free to edit its elements by reference. */
             vector<WallData>*  getTileWalls(int tileId);
 
 	        /* Loads texture from file `pngFile` to an array. Returns array index at which the texture was

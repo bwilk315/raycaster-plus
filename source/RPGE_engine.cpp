@@ -182,11 +182,13 @@ namespace rpge {
         elapsedTime = tpCurrent - tpLast;
         tpLast = tpCurrent;
 
+
         /************************************/
         /************************************/
         /********** GET INPUT DATA **********/
         /************************************/
         /************************************/
+
 
         // Complete the key states
         auto ksCopy = keyStates; // To avoid iteration through dynamicly-sized map
@@ -218,11 +220,13 @@ namespace rpge {
             }
         }
 
+
         /********************************************/
         /********************************************/
         /********** FILL THE SCREEN BUFFER **********/
         /********************************************/
         /********************************************/
+
 
         const int rhStart = rRenderArea.y;
         const int rhEnd   = rRenderArea.y + rRenderArea.h;
@@ -255,118 +259,117 @@ namespace rpge {
         #endif
         for( ; column < (rRenderArea.x + rRenderArea.w); column += iColumnsPerRay) {
 
-            // Position of the ray on the camera plane, from -1 (left) to 1 (right)
-            float cameraX = 2 * (column - rRenderArea.x) / (float)rRenderArea.w - 1;
+            // Drawing exclusions for the current pixel column encoded in key-value pair (start-end heights in screen coordinates)
+            vector<pair<int, int>> drawExcls;
+            bool keepWalking = true;
+
+            // Position of the ray on the camera plane, from -1 (leftmost) to 1 (rightmost)
+            float cameraX  = 2 * (column - rRenderArea.x) / (float)rRenderArea.w - 1;
             Vector2 rayDir = (camDir + planeVec * cameraX).normalized();
 
-            // Perform step-based DDA algorithm to find out which tiles get hit by the ray, find
-            // the nearest wall of the nearest tile.
             walker->init(camPos, rayDir);
-            bool keepWalking = true;
-            
-            // YOU MUST DEPENDIZE THIS BELOW ON TILE ORDER, FOR NOW IT DOES NOT TAKE IT INTO ACCOUNT,
-            // THEREFORE TILES THAT ARE NEAR ARE NOT DRAWN BC FARER ONE IS CONSIDERED FIRST INSTEAD
-
-            // Vector of pairs indicating draw height exclusions as global pixel coordinate (key: start, value: end)
-            vector<pair<int, int>> drawExcls;
-
-
-            #ifdef DEBUG 
-            if(column == iScreenWidth / 2) {
-                system("clear");
-            }
-            #endif
-
-
             while(keepWalking) {
-                if(walker->rayFlag == DDA::RF_FAIL)
-                    break;
+
+
+                /****************************************************/
+                /********** DDA-BASED RAY WALK PERFORMANCE **********/
+                /****************************************************/
+
 
                 RayHitInfo hit = walker->next();
-
-                if((walker->rayFlag & DDA::RF_TOO_FAR) || (walker->rayFlag & DDA::RF_OUTSIDE))
+                if( walker->rayFlag & (DDA::RF_TOO_FAR | DDA::RF_OUTSIDE | DDA::RF_FAIL) )
                     break;
-                else if(!(walker->rayFlag & DDA::RF_HIT))
+                else if( !(walker->rayFlag & DDA::RF_HIT) )
                     continue;
 
-                // Compute the ray-tile intersection point, in local tile coordinates.
-                // If hit distance is exactly 0 it indicates hit occurred inside the origin tile.
-                Vector2 rayEnter;
+                // Compute the ray-tile intersection point in local tile coordinates, keep it pivoted to the bottom-left corner
+                // of a tile when looking at it from the top. If hit distance is exactly 0 it indicates that hit occurred inside
+                // the origin tile.
+                Vector2 localEnter;
                 float localX = hit.point.x - (int)hit.point.x;
                 float localY = hit.point.y - (int)hit.point.y;
                 if(walker->rayFlag & DDA::RF_SIDE) {
-                    rayEnter.x = !hit.distance ? localX : (rayDir.x < 0);
-                    rayEnter.y = localY;
+                    localEnter.x = !hit.distance ? localX : (rayDir.x < 0);
+                    localEnter.y = localY;
                 } else {
-                    rayEnter.x = localX;
-                    rayEnter.y = !hit.distance ? localY : (rayDir.y < 0);
+                    localEnter.x = localX;
+                    localEnter.y = !hit.distance ? localY : (rayDir.y < 0);
                 }
 
-                // Sort walls by their distance to the camera plane in ascending order (not done yet)
-
-                int tileData = mainScene->getTileId(hit.tile.x, hit.tile.y);
-                const vector<WallData>* wallData = mainScene->getTileWalls(tileData);
+                // Obtain collection of walls defined for the hit tile, if there are any
+                int tileId = mainScene->getTileId(hit.tile.x, hit.tile.y);
+                const vector<WallData>* wallData = mainScene->getTileWalls(tileId);
                 if(wallData == nullptr)
                     continue;
 
+
+                /************************************************************************/
+                /********** PREPARATION OF INFORMATION REQUIRED TO DRAW COLUMN **********/
+                /************************************************************************/
+
+
                 // Collect draw information as pointers to dedicated structure
                 int wallCount = wallData->size();
-                int dipLen = 0; // drawInfoPtrs length (used also as index)
-                ColumnDrawInfo* drawInfoPtrs[wallCount]; // Contains nullptrs if ray misses a wall
+                // Tells how many first items of `drawInfoPtrs` array are not null pointers
+                int dipLen    = 0;
+                // Draw information is stored as pointers because they are more efficient to sort later
+                ColumnDrawInfo* drawInfoPtrs[wallCount];
                 for(int i = 0; i != wallCount; i++) {
                     ColumnDrawInfo* cdi = new ColumnDrawInfo;
                     cdi->wallDataPtr = &wallData->at(i);
 
-                    // COMPUTATION WITHOUT USING SQUARE ROOT (can be simplified further)
                     // The formula below was derived by parts, and compressed into one long computation
-                    // NOTE: this formula works even when enter point is actually inside a tile
-                    float a = cdi->wallDataPtr->func.slope;
-                    float h = cdi->wallDataPtr->func.height;
-                    float interDist = ( rayEnter.y - a * rayEnter.x - ( h == 0 ? SAFE_LINE_HEIGHT : h ) ) / ( rayDir.x * a - rayDir.y );
+                    // NOTE: this formula works even when enter point is actually inside a tile.
+                    float a         = cdi->wallDataPtr->func.slope;
+                    float h         = cdi->wallDataPtr->func.height;
+                    float interDist = ( localEnter.y - a * localEnter.x - ( h == 0 ? SAFE_LINE_HEIGHT : h ) ) / ( rayDir.x * a - rayDir.y );
 
                     // Distance is negative when a wall is not reached by the ray, this and the fact that the longest
                     // distance in tile boundary is 1/sqrt(2), can be used to perform early classification.
                     if(interDist >= 0 && interDist <= SQRT2) {
-                        cdi->localInter = interDist * rayDir + rayEnter;
+                        cdi->localInter = interDist * rayDir + localEnter;
 
-
-                        // Check if point is included in arguments and values range
+                        // Check if point is included in arguments and values range defined
                         if((cdi->localInter.x >= cdi->wallDataPtr->func.xMin && cdi->localInter.x <= cdi->wallDataPtr->func.xMax) &&
                            (cdi->localInter.y >= cdi->wallDataPtr->func.yMin && cdi->localInter.y <= cdi->wallDataPtr->func.yMax)) {
 
                             cdi->perpDist = rayDir.dot(camDir) * ( hit.distance + interDist );
                             drawInfoPtrs[dipLen++] = cdi;
-
                             continue;
                         }
                     }
 
-                    // Ray missed that wall, therefore its information is garbage
+                    // Ray missed the wall, therefore its information is garbage
                     delete cdi;
                 }
-
                 if(dipLen == 0)
                     continue;
 
-                // SOLUTION: MAKE STRUCTURE THAT TAKES TILE INTO ACCOUNT (I.E. NOT BY DETECTION OF THE LOWER BOUND)
-                // Sort the information in ascending order, perform it on pointers to avoid copying
+                // Perform bubble sort on the drawing information in ascending order, sort by distance from the camera plane
                 for(int i = 0; i != dipLen; i++) {
                     for(int j = 1; j != dipLen; j++) {
                         if(drawInfoPtrs[j - 1]->perpDist > drawInfoPtrs[j]->perpDist) {
                             ColumnDrawInfo* temp = drawInfoPtrs[j];
-                            drawInfoPtrs[j] = drawInfoPtrs[j - 1];
-                            drawInfoPtrs[j - 1] = temp;
+                            drawInfoPtrs[j]      = drawInfoPtrs[j - 1];
+                            drawInfoPtrs[j - 1]  = temp;
                         }
                     }
                 }
+
+
+                /******************************************************************************/
+                /********** COLUMN DRAWING USING COLLECTED WALLS DRAWING INFORMATION **********/
+                /******************************************************************************/
+
+
                 for(int i = 0; i != dipLen; i++) {
                     ColumnDrawInfo* cdi = drawInfoPtrs[i];
 
-                    // Calculate a normal vector of the wall, it always points outwards it
+                    // Calculate a normal vector of the wall, it always points outwards
                     bool flipped = false;
-                    float a = cdi->wallDataPtr->func.slope;
-                    float h = cdi->wallDataPtr->func.height;
-                    float coef = 1 / sqrt( a * a + 1 );
+                    float a      = cdi->wallDataPtr->func.slope;
+                    float h      = cdi->wallDataPtr->func.height;
+                    float coef   = 1 / sqrt( a * a + 1 );
                     Vector2 normal(a * coef, -1 * coef);
                     if(camPos.y >= a * (camPos.x - hit.tile.x) + hit.tile.y + h) {
                         normal *= -1;
@@ -374,126 +377,78 @@ namespace rpge {
                     }
 
                     // Find out range describing how column should be drawn for the current wall
-                    int lineHeight  = rRenderArea.h * (pcmDist / cdi->perpDist);
-                    int drawStart   = rhStart + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
-                    int drawEnd     = rhStart + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
-                    int startClip   = drawEnd > rhEnd ? (drawEnd - rhEnd) : 0;
-                    int totalHeight = drawEnd - drawStart;
+                    int lineHeight = rRenderArea.h * (pcmDist / cdi->perpDist);
+                    int drawStart  = rhStart + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
+                    int drawEnd    = rhStart + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
 
-                    SDL_LockSurface(sdlSurface);
-                    
-                    const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
-                    bool isSolidColor = tex == nullptr;
-
-                    int texHeight = isSolidColor ? 1 : tex->getHeight();
-                    // Compute normalized horizontal position on the wall plane
-                    float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
-                    if(flipped)
-                        planeHorizontal = 1 - planeHorizontal;
-
-                    // Draw column using drawable information
-                    int exclCount = drawExcls.empty() ? 0 : drawExcls.size();
-                    int dbStart = clamp(drawStart, rhStart, rhEnd);
-                    int dbEnd   = clamp(drawEnd - startClip, rhStart, rhEnd);
-
-                    // Find  out jumping information
-                    int jumpIndex = -1;
+                    // Prepare for examining exclusion ranges, find drawable start and height coordinates (meaning they
+                    // are able to be displayed in the render area).
                     bool isVisible = true;
+                    int dbStart    = clamp(drawStart, rhStart, rhEnd);
+                    int dbEnd      = clamp(drawEnd,   rhStart, rhEnd);
+                    int exclCount  = drawExcls.size();
+                    int jumpIndex  = -1;     // Index of exclusion that is going to limit drawing first
+                    pair<int, int> jumpExcl; // Initial content at the index `jumpIndex`, it gets dynamically updated later
+
+                    // Find index of the first exclusion limiting the drawing range, if there is any
                     for(int e = 0; e < exclCount; e++) {
                         const pair<int, int>& excl = drawExcls.at(e);
-                        bool inclStart = excl.first  > dbStart && excl.first  < dbEnd;
-                        bool inclEnd   = excl.second > dbStart && excl.second < dbEnd;
+                        bool startIn = excl.first  > dbStart && excl.first  < dbEnd;
+                        bool endIn   = excl.second > dbStart && excl.second < dbEnd;
 
-                        if(inclStart && inclEnd) {
-                            // Exclusion is included in drawing range
-                            if(jumpIndex == -1) {
-                                jumpIndex = e;
-
-
-                                #ifdef DEBUG 
-                                if(column == iScreenWidth / 2) {
-                                    cout << "Set jumpIndex! " << e << ": " << excl.first << ", " << excl.second << endl;
-                                }
-                                #endif
-
-
-                            }
-                        } else if(inclStart) {
-                            // Only start is included
+                        if(startIn && endIn) {
+                            // Exclusion is included in drawing range.
+                            // Collect its index and finish the loop, it is later used for checking next ones only because
+                            // the exclusions vector is sorted.
+                            jumpIndex = e;
+                            jumpExcl  = excl;
+                            break;
+                        } else if(startIn) {
+                            // Only exclusion start is included.
+                            // Shrink the bottom coordinate and perform the loop over again to make sure new coordinate does
+                            // not interfere with anything.
                             dbEnd = excl.first;
                             e = 0;
-                        } else if(inclEnd) {
-                            // Only end is included
+                        } else if(endIn) {
+                            // Only exclusion end is included.
+                            // Similarly to the `startIn` only (above), shrink the top coordinate and loop over again.
                             dbStart = excl.second;
                             e = 0;
                         } else if(excl.first <= dbStart && excl.second >= dbEnd) {
-                            // Exclusion eats the whole drawing range
+                            // Exclusion eats the whole drawing range.
+                            // Therefore the column is not visible by any mean, so skip it.
                             isVisible = false;
                             break;
-                        } else {
-                            // Exclusion is not touching the drawing range at all
                         }
-
-
-                        #ifdef DEBUG 
-                        if(column == iScreenWidth / 2) {
-                            cout << "Iter " << e << ": " << jumpIndex << ", se: " << dbStart << ", " << dbEnd << endl;
-                        }
-                        #endif
-
-
                     }
-
-
-                    #ifdef DEBUG 
-                    if(column == iScreenWidth / 2) {
-                        cout << "\n(  " << isVisible << "  ) Draw start/end: " << dbStart << ", " << dbEnd << ",,, dist = " << cdi->perpDist << endl;
-                    }
-                    #endif
-
 
                     if(isVisible) {
 
-                        pair<int, int> jumpExcl = jumpIndex == -1 ? make_pair(-1, -1) : drawExcls.at(jumpIndex);
+                        const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
+                        int totalHeight    = drawEnd - drawStart;
+                        bool isSolidColor  = tex == nullptr;
+
+                        // Compute normalized horizontal position on the wall plane
+                        float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
+                        if(flipped)
+                            planeHorizontal = 1 - planeHorizontal;
+
+                        SDL_LockSurface(sdlSurface);
                         for(int h = dbStart; h < dbEnd; h++) {
 
-                            // Perform jumping if neccessary
-                            if(h >= jumpExcl.first && h <= jumpExcl.second && jumpIndex != -1) {
-
-                                #ifdef DEBUG 
-                                if(column == iScreenWidth / 2) {
-                                    cout << "WallDist: " << cdi->perpDist << ", jump from " << h << " to " << jumpExcl.second << " .-. " << jumpIndex << ", (ec= " << exclCount << ")" << endl;
-                                }
-                                #endif
-
-                                // Find next jump exclusion, it must be under the current one
+                            // Perform jumping if neccessary, if it is then find the next exclusion range below the current one
+                            if(jumpIndex != -1 && h >= jumpExcl.first && h <= jumpExcl.second) {
                                 h = jumpExcl.second;
-                                while(jumpExcl.second <= h) {
-                                    if(++jumpIndex < exclCount) {
-                                        jumpExcl = drawExcls.at(jumpIndex);
-                                    } else {
-                                        break;
-                                    }
-                                }
-
-                                //h  -= iRowsInterval; // it will be balanced in the next iteration
+                                while(++jumpIndex < exclCount && jumpExcl.second <= h)
+                                    jumpExcl = drawExcls.at(jumpIndex);
                                 continue;
-                            } else {
-
-                                
-                                #ifdef DEBUG 
-                                if(column == iScreenWidth / 2) {
-                                    cout << cdi->perpDist << ", " << h << " == no " << endl;
-                                }
-                                #endif
-
-
                             }
-
+                            // Actual drawing is done according to rows interval setting, however it is implemented in this specific
+                            // form to properly recognize when loop enters exclusion range (if statement above evaluates to true).
                             if(h % iRowsInterval != 0)
                                 continue;
 
-                            // Obtain a current pixel color
+                            // Obtain the current texture pixel color if there is any texture, otherwise use the wall `tint`
                             uint8_t tr, tg, tb, ta;
                             if(isSolidColor) {
                                 SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurface->format, &tr, &tg, &tb, &ta);
@@ -506,13 +461,13 @@ namespace rpge {
                             if(bLightEnabled) {
                                 const float minBn = 0.2f;
                                 float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
-                                float bn = minBn + (1 - minBn) * perc; // Final brightness
+                                float bn = minBn + (1 - minBn) * perc;             // Final brightness
                                 tr *= bn;
                                 tg *= bn;
                                 tb *= bn;
                             }
 
-                            // Draw pixel to the buffer
+                            // Draw pixel(s) to the buffer. Amount of drawn pixels depends on columns-per-ray and rows interval settings
                             uint32_t color = SDL_MapRGB(sdlSurface->format, tr, tg, tb);
                             for(int c = 0; c != iColumnsPerRay; c++) {
                                 int hor = c + column;
@@ -532,7 +487,7 @@ namespace rpge {
 
                         // Append new exclusion, do it so vector remains sorted according to exclusions' start coordinate
                         if(dbStart != dbEnd) {
-                            int index = exclCount == 0 ? 0 : (exclCount);
+                            int index = exclCount == 0 ? 0 : exclCount;
                             for(int e = 0; e < exclCount; e++) {
                                 if(dbStart <= drawExcls.at(e).first) {
                                     index = e;
@@ -542,69 +497,47 @@ namespace rpge {
                             drawExcls.insert(drawExcls.begin() + index, make_pair(dbStart, dbEnd));
                             exclCount++;
                         }
-
                     }
 
-
-                    #ifdef DEBUG 
-                    if(column == iScreenWidth / 2) {
-                        for(auto sus: drawExcls)
-                            cout << sus.first << ", " << sus.second << endl;
-                        cout << endl;
-                    }
-                    #endif
-
-
+                    // Decide if ray should keep on walking, free column drawing information because it was already used
                     if(cdi->wallDataPtr->stopsRay)
                         keepWalking = false;
-
                     delete cdi;
-
                     if(!keepWalking)
                         break;
                 }
             }
 
             #ifdef DEBUG
-            /* DRAW START AND END COORDINATE POINTS OVER THE CURRENT COLUMN, WHICH IN CONTINOUS COLUMNS DRAWING
-             * WILL RESULT IN DRAW START(GREEN)/END(RED) LINES */
-            int exclCount = drawExcls.empty() ? 0 : drawExcls.size();
-
+            
+            // Draw exclusions start and end coordinates in debugging purposes
             SDL_UnlockSurface(sdlSurface);
-            for(int e = 0; e < exclCount; e++) {
-                const pair<int, int>& range = drawExcls.at(e);
-
-                // This draws line ranges
+            for(const pair<int, int>& excl : drawExcls) {
                 for(int c = 0; c < iColumnsPerRay; c++) {
                     int hor = c + column;
                     if(hor < 0 || hor >= sdlSurface->w)
                         break;
                     for(int r = 0; r < iRowsInterval; r++) {
 
-                        int verS = range.first + r - 1;
+                        int verS = excl.first + r - 1;
                         if(verS < 0 || verS >= sdlSurface->h)
                             break;
                         pixels[hor + verS * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 0, 255, 0);
 
-                        int verE = range.second + r - 1;
+                        int verE = excl.second + r - 1;
                         if(verE < 0 || verE >= sdlSurface->h)
                             break;
-                        pixels[hor + verE * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 0, 255, 0);
+                        pixels[hor + verE * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 255, 0, 0);
 
                     }
                 }
             }
             SDL_LockSurface(sdlSurface);
 
-            /* DRAW CENTRAL VERTICAL LINE, IT IS KINDA BUGGED FOR NOW */
-
+            // Perform one-time actions when column is nearly at the center of the screen
             if(!centerDebugDone && abs(column - iScreenWidth / 2) <= iColumnsPerRay) {
-                // system("clear");
-                // for(auto sus : drawExcls)
-                //     cout << sus.first << ", " << sus.second << endl;
                 for(int i = rRenderArea.y; i < rRenderArea.h + rRenderArea.y; i++)
                     pixels[iScreenWidth / 2 + i * sdlSurface->w] = 0xffffff;
-
                 centerDebugDone = true;
             }
             #endif
@@ -613,19 +546,21 @@ namespace rpge {
         if(bIsCursorLocked)
             SDL_WarpMouseInWindow(sdlWindow, iScreenWidth / 2, iScreenHeight / 2);
         
+
         /***********************************************/
         /***********************************************/
         /********** DISPLAY THE SCREEN BUFFER **********/
         /***********************************************/
         /***********************************************/
 
+
         int delay = (1.0f / iFramesPerSecond - elapsedTime.count()) * 1000;
         delay = delay < 0 ? 0 : delay;
 
         #ifdef DEBUG
         if(frameIndex % iFramesPerSecond == 0) {
-            // system("clear");
-            // cout << "Delay [ms]: " << delay << "\n";
+            //system("clear");
+            //cout << "Delay [ms]: " << delay << "\n";
         }
         #endif
         

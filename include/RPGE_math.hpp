@@ -43,8 +43,8 @@ namespace rpge {
         Vector2();
         Vector2(float x, float y);
 
-        float dot(const Vector2& other) const;
-        float magnitude() const;
+        float   dot(const Vector2& other) const;
+        float   magnitude() const;
         Vector2 normalized() const;
         Vector2 orthogonal() const;  // Vector that is clockwisely-perpendicular
         Vector2 rotate(float radians) const;  // Vector rotated anti-clockwisely

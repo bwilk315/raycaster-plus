@@ -23,14 +23,14 @@ namespace rpge {
     using ::std::string;
     using ::std::noskipws;
 
-    /* Checks whether given string `text` is a floating point number in any form, for example
-     * number 100.23 can be written in scienfitic notation as 1.0023e+2, both are considered floats. */
-    bool isFloat(const string& text);
-
     /* Limits the number `value` so it is included in inclusive range < `min` ; `max` >.
      * If `value` exceeds minimum or maximum, it becomes the limiting value. */
     int   clamp(int value, int min, int max);
     float clamp(float value, float min, float max);
+
+    /* Checks whether given string `text` is a floating point number in any form, for example
+     * number 100.23 can be written in scienfitic notation as 1.0023e+2, both are considered floats. */
+    bool  isFloat(const string& text);
 }
 
 #endif
