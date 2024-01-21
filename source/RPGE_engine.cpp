@@ -397,12 +397,13 @@ namespace rpge {
                         bool endIn   = excl.second > dbStart && excl.second < dbEnd;
 
                         if(startIn && endIn) {
-                            // Exclusion is included in drawing range.
+                            // Exclusion is included in drawing range for the first time.
                             // Collect its index and finish the loop, it is later used for checking next ones only because
                             // the exclusions vector is sorted.
-                            jumpIndex = e;
-                            jumpExcl  = excl;
-                            break;
+                            if(jumpIndex == -1) {
+                                jumpIndex = e;
+                                jumpExcl  = excl;
+                            }
                         } else if(startIn) {
                             // Only exclusion start is included.
                             // Shrink the bottom coordinate and perform the loop over again to make sure new coordinate does
@@ -439,8 +440,12 @@ namespace rpge {
                             // Perform jumping if neccessary, if it is then find the next exclusion range below the current one
                             if(jumpIndex != -1 && h >= jumpExcl.first && h <= jumpExcl.second) {
                                 h = jumpExcl.second;
-                                while(++jumpIndex < exclCount && jumpExcl.second <= h)
-                                    jumpExcl = drawExcls.at(jumpIndex);
+                                while(jumpExcl.second <= h) {
+                                    if(++jumpIndex < exclCount)
+                                        jumpExcl = drawExcls.at(jumpIndex);
+                                    else
+                                        break;
+                                }
                                 continue;
                             }
                             // Actual drawing is done according to rows interval setting, however it is implemented in this specific
@@ -556,13 +561,6 @@ namespace rpge {
 
         int delay = (1.0f / iFramesPerSecond - elapsedTime.count()) * 1000;
         delay = delay < 0 ? 0 : delay;
-
-        #ifdef DEBUG
-        if(frameIndex % iFramesPerSecond == 0) {
-            //system("clear");
-            //cout << "Delay [ms]: " << delay << "\n";
-        }
-        #endif
         
         SDL_Delay(delay); // Maybe this causes the lag when unfreezing?
 
