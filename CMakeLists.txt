@@ -1,4 +1,6 @@
 
+# This way of making shared library (not even including static one) must be replaced in the future
+
 cmake_minimum_required(VERSION 3.28.1)
 
 project(
