@@ -462,6 +462,10 @@ namespace rpge {
                                 SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical), sdlSurface->format, &tr, &tg, &tb, &ta);
                             }
 
+                            // If pixel is transparent in any level, do not draw it
+                            if(ta != 255)
+                                continue;
+
                             // Apply lightning to the color
                             if(bLightEnabled) {
                                 const float minBn = 0.2f;

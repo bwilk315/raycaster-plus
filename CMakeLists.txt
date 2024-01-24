@@ -40,5 +40,6 @@ set_target_properties(
 	OUTPUT_NAME ${CMAKE_PROJECT_NAME}
 )
 target_include_directories(${RPGE_SHARED} PUBLIC ${CMAKE_BINARY_DIR}/include)
+#target_compile_definitions(${RPGE_SHARED} PRIVATE DEBUG)  # For debugging
 
 install(TARGETS ${RPGE_STATIC} ${RPGE_SHARED} DESTINATION /usr/lib)
