@@ -2,9 +2,9 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="210mm"
-   height="297mm"
-   viewBox="0 0 210 297"
+   width="800"
+   height="450"
+   viewBox="0 0 211.66666 119.06249"
    version="1.1"
    id="svg1"
    inkscape:version="1.3.2 (091e20ef0f, 2023-11-25, custom)"
@@ -24,8 +24,8 @@
      inkscape:deskcolor="#505050"
      inkscape:document-units="mm"
      inkscape:zoom="0.7483165"
-     inkscape:cx="396.89089"
-     inkscape:cy="561.25984"
+     inkscape:cx="223.1676"
+     inkscape:cy="396.89089"
      inkscape:window-width="1920"
      inkscape:window-height="1037"
      inkscape:window-x="0"
@@ -37,5 +37,183 @@
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
-     id="layer1" />
+     id="layer1">
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1"
+       width="25.070625"
+       height="25.070621"
+       x="13.923021"
+       y="13.923021" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-5"
+       width="25.070625"
+       height="25.070621"
+       x="39.058437"
+       y="13.923021" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-5-2"
+       width="25.070625"
+       height="25.070621"
+       x="64.19384"
+       y="13.923023" />
+    <rect
+       style="fill:#0400ff;fill-opacity:0.18;stroke:#000000;stroke-width:1.32628;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-5-2-2"
+       width="75.402885"
+       height="75.402885"
+       x="122.37175"
+       y="13.892307" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-7"
+       width="25.070625"
+       height="25.070621"
+       x="13.923023"
+       y="39.058441" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-5-0"
+       width="25.070625"
+       height="25.070621"
+       x="39.058441"
+       y="39.058441" />
+    <rect
+       style="fill:#0400ff;fill-opacity:0.18;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-5-2-9"
+       width="25.070625"
+       height="25.070621"
+       x="64.19384"
+       y="39.058445" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-6"
+       width="25.070625"
+       height="25.070621"
+       x="13.923023"
+       y="64.193855" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-5-26"
+       width="25.070625"
+       height="25.070621"
+       x="39.058441"
+       y="64.193855" />
+    <rect
+       style="fill:none;stroke:#000000;stroke-width:1.38771;stroke-dasharray:none;stroke-opacity:1"
+       id="rect1-5-2-1"
+       width="25.070625"
+       height="25.070621"
+       x="64.193848"
+       y="64.193855" />
+    <circle
+       style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       id="path1"
+       cx="13.890624"
+       cy="89.296875"
+       r="2.1166666" />
+    <circle
+       style="fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       id="path1-7"
+       cx="64.161446"
+       cy="64.161461"
+       r="2.1166666" />
+    <circle
+       style="fill:#00ff00;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       id="path1-7-5"
+       cx="89.296814"
+       cy="39.026043"
+       r="2.1166666" />
+    <circle
+       style="fill:#00ff00;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       id="path1-7-5-7"
+       cx="197.77628"
+       cy="13.890625"
+       r="2.1166666" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       x="6.2728305"
+       y="98.281677"
+       id="text1"><tspan
+         sodipodi:role="line"
+         id="tspan1"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ffffff;fill-opacity:1;stroke-width:1.32292"
+         x="6.2728305"
+         y="98.281677">[0,0]</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:8.46667px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       x="38.637432"
+       y="111.71204"
+       id="text1-3"><tspan
+         sodipodi:role="line"
+         id="tspan1-0"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:8.46667px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ffffff;fill-opacity:1;stroke-width:1.32292"
+         x="38.637432"
+         y="111.71204">Global</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:8.46667px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       x="150.11096"
+       y="111.71204"
+       id="text1-3-8"><tspan
+         sodipodi:role="line"
+         id="tspan1-0-8"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:8.46667px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ffffff;fill-opacity:1;stroke-width:1.32292"
+         x="150.11096"
+         y="111.71204">Local</tspan></text>
+    <circle
+       style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       id="path1-3"
+       cx="122.36998"
+       cy="89.296875"
+       r="2.1166666" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       x="114.752"
+       y="98.281677"
+       id="text1-6"><tspan
+         sodipodi:role="line"
+         id="tspan1-1"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ffffff;fill-opacity:1;stroke-width:1.32292"
+         x="114.752"
+         y="98.281677">[0,0]</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       x="45.948723"
+       y="72.158531"
+       id="text1-7"><tspan
+         sodipodi:role="line"
+         id="tspan1-8"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#ff0000;fill-opacity:1;stroke-width:1.32292"
+         x="45.948723"
+         y="72.158531">[2,1]</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#00ff00;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       x="71.674271"
+       y="35.250221"
+       id="text1-7-6"><tspan
+         sodipodi:role="line"
+         id="tspan1-8-5"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#00ff00;fill-opacity:1;stroke-width:1.32292"
+         x="71.674271"
+         y="35.250221">[3,2]</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#00ff00;fill-opacity:1;stroke:none;stroke-width:1.32292;stroke-dasharray:none;stroke-opacity:1"
+       x="190.29123"
+       y="9.3545971"
+       id="text1-7-6-5"><tspan
+         sodipodi:role="line"
+         id="tspan1-8-5-4"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:5.64444px;font-family:'Envy Code R';-inkscape-font-specification:'Envy Code R';fill:#00ff00;fill-opacity:1;stroke-width:1.32292"
+         x="190.29123"
+         y="9.3545971">[1,1]</tspan></text>
+  </g>
 </svg>

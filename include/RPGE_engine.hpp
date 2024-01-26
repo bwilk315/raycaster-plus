@@ -72,7 +72,7 @@ namespace rpge {
             uint32_t*     pixels; // Array of window surface pixels
             const Camera* mainCamera;
             DDA*          walker;
-            SDL_Surface*  sdlSurface;
+            SDL_Surface*  sdlSurf;
             SDL_Window*   sdlWindow;
 
         public:

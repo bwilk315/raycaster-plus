@@ -56,13 +56,14 @@ namespace rpge {
             this->pixels     = nullptr;
             this->mainCamera = nullptr;
             this->walker     = new DDA();
-            this->sdlSurface = nullptr;
+            this->sdlSurf    = nullptr;
             this->sdlWindow  = SDL_CreateWindow("Raycaster Plus Engine", 0, 0, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
             if(sdlWindow != nullptr) {
-                SDL_SetWindowResizable(this->sdlWindow, SDL_FALSE);
-                this->sdlSurface = SDL_GetWindowSurface(sdlWindow);
-                if(sdlSurface != nullptr) {
-                    pixels = (uint32_t*)sdlSurface->pixels;
+                this->sdlSurf = SDL_GetWindowSurface(sdlWindow);
+                if(sdlSurf != nullptr) {
+                    // Everything is OK
+                    SDL_SetWindowResizable(this->sdlWindow, SDL_FALSE);
+                    pixels = (uint32_t*)sdlSurf->pixels;
                     return;
                 }
             }
@@ -83,7 +84,7 @@ namespace rpge {
         bClear = true;
     }
     const SDL_PixelFormat* Engine::getColorFormat() const {
-        return sdlSurface == nullptr ? nullptr : sdlSurface->format;
+        return sdlSurf == nullptr ? nullptr : sdlSurf->format;
     }
     void Engine::stop() {
         bRun = false;
@@ -245,9 +246,9 @@ namespace rpge {
 
         // Clear the entire screen buffer if requested
         if(bClear) {
-            SDL_LockSurface(sdlSurface);
-            memset(pixels, 0, sdlSurface->pitch * sdlSurface->h);
-            SDL_UnlockSurface(sdlSurface);
+            SDL_LockSurface(sdlSurf);
+            SDL_memset(pixels, 0, sdlSurf->h * sdlSurf->pitch);
+            SDL_UnlockSurface(sdlSurf);
             bClear = false;
         }
         // Skip drawing process if redrawing is not requested
@@ -377,15 +378,15 @@ namespace rpge {
                     }
 
                     // Find out range describing how column should be drawn for the current wall
-                    int lineHeight = rRenderArea.h * (pcmDist / cdi->perpDist);
-                    int drawStart  = rhStart + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
-                    int drawEnd    = rhStart + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
+                    float lineHeight = rRenderArea.h * (pcmDist / cdi->perpDist);
+                    float drawStart  = rhStart + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
+                    float drawEnd    = rhStart + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
 
                     // Prepare for examining exclusion ranges, find drawable start and height coordinates (meaning they
-                    // are able to be displayed in the render area).
+                    // are able to be displayed in the render area).    
                     bool isVisible = true;
-                    int dbStart    = clamp(drawStart, rhStart, rhEnd);
-                    int dbEnd      = clamp(drawEnd,   rhStart, rhEnd);
+                    int dbStart    = clamp((int)drawStart, rhStart, rhEnd);
+                    int dbEnd      = clamp((int)drawEnd,   rhStart, rhEnd);
                     int exclCount  = drawExcls.size();
                     int jumpIndex  = -1;     // Index of exclusion that is going to limit drawing first
                     pair<int, int> jumpExcl; // Initial content at the index `jumpIndex`, it gets dynamically updated later
@@ -434,7 +435,6 @@ namespace rpge {
                         if(flipped)
                             planeHorizontal = 1 - planeHorizontal;
 
-                        SDL_LockSurface(sdlSurface);
                         for(int h = dbStart; h < dbEnd; h++) {
 
                             // Perform jumping if neccessary, if it is then find the next exclusion range below the current one
@@ -456,10 +456,10 @@ namespace rpge {
                             // Obtain the current texture pixel color if there is any texture, otherwise use the wall `tint`
                             uint8_t tr, tg, tb, ta;
                             if(isSolidColor) {
-                                SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurface->format, &tr, &tg, &tb, &ta);
+                                SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurf->format, &tr, &tg, &tb, &ta);
                             } else {
                                 float planeVertical = 1.0f - (h - drawStart) / (float)totalHeight;
-                                SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical), sdlSurface->format, &tr, &tg, &tb, &ta);
+                                SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical), sdlSurf->format, &tr, &tg, &tb, &ta);
                             }
 
                             // If pixel is transparent in any level, do not draw it
@@ -477,22 +477,22 @@ namespace rpge {
                             }
 
                             // Draw pixel(s) to the buffer. Amount of drawn pixels depends on columns-per-ray and rows interval settings
-                            uint32_t color = SDL_MapRGB(sdlSurface->format, tr, tg, tb);
+                            SDL_LockSurface(sdlSurf);
+                            uint32_t color = SDL_MapRGB(sdlSurf->format, tr, tg, tb);
                             for(int c = 0; c != iColumnsPerRay; c++) {
                                 int hor = c + column;
-                                if(hor < 0 || hor >= sdlSurface->w)
+                                if(hor < 0 || hor >= sdlSurf->w)
                                     break;
                                 for(int r = 0; r != iRowsInterval; r++) {
                                     int ver = h + r - 1;
-                                    if(ver < 0 || ver >= sdlSurface->h)
+                                    if(ver < 0 || ver >= sdlSurf->h)
                                         break;
                                     
-                                    pixels[hor + ver * sdlSurface->w] = color;
+                                    pixels[hor + ver * sdlSurf->w] = color;
                                 }
                             }
+                            SDL_UnlockSurface(sdlSurf);
                         }
-
-                        SDL_UnlockSurface(sdlSurface);
 
                         // Append new exclusion, do it so vector remains sorted according to exclusions' start coordinate
                         if(dbStart != dbEnd) {
@@ -520,7 +520,7 @@ namespace rpge {
             #ifdef DEBUG
             
             // Draw exclusions start and end coordinates in debugging purposes
-            SDL_UnlockSurface(sdlSurface);
+            SDL_LockSurface(sdlSurface);
             for(const pair<int, int>& excl : drawExcls) {
                 for(int c = 0; c < iColumnsPerRay; c++) {
                     int hor = c + column;
@@ -541,7 +541,6 @@ namespace rpge {
                     }
                 }
             }
-            SDL_LockSurface(sdlSurface);
 
             // Perform one-time actions when column is nearly at the center of the screen
             if(!centerDebugDone && abs(column - iScreenWidth / 2) <= iColumnsPerRay) {
@@ -549,6 +548,8 @@ namespace rpge {
                     pixels[iScreenWidth / 2 + i * sdlSurface->w] = 0xffffff;
                 centerDebugDone = true;
             }
+            SDL_UnlockSurface(sdlSurface);
+
             #endif
         }
 
