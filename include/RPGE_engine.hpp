@@ -61,6 +61,7 @@ namespace rpge {
             int                      iScreenWidth;
             int                      iScreenHeight;
             float                    fAspectRatio;
+            uint32_t                 cClearColor;
             uint64_t                 frameIndex;
             RenderFitMode            renderFitMode;
             Vector2                  vLightDir;
@@ -86,8 +87,8 @@ namespace rpge {
             Engine(int screenWidth, int screenHeight);
             ~Engine();
 
-            /* Makes all pixels of the render area black once per frame */
-            void                   clear();
+            /* Sets all pixels' channels to `r`, `g` and `b` respectively, once per frame */
+            void                   clear(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0);
 
             const SDL_PixelFormat* getColorFormat() const;
 

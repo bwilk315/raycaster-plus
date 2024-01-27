@@ -44,6 +44,7 @@ namespace rpge {
         this->iScreenWidth       = screenWidth < 1 ? 1 : screenWidth;
         this->iScreenHeight      = screenHeight < 1 ? 1 : screenHeight;
         this->fAspectRatio       = iScreenHeight / (float)iScreenWidth;
+        this->cClearColor        = 0;
         this->frameIndex         = 0;
         this->renderFitMode      = RenderFitMode::UNKNOWN;
         this->vLightDir          = Vector2::RIGHT;
@@ -80,7 +81,8 @@ namespace rpge {
             SDL_Quit();
         }
     }
-    void Engine::clear() {
+    void Engine::clear(uint8_t r, uint8_t g, uint8_t b) {
+        cClearColor = SDL_MapRGB(sdlSurf->format, r, g, b);
         bClear = true;
     }
     const SDL_PixelFormat* Engine::getColorFormat() const {
@@ -247,7 +249,8 @@ namespace rpge {
         // Clear the entire screen buffer if requested
         if(bClear) {
             SDL_LockSurface(sdlSurf);
-            SDL_memset(pixels, 0, sdlSurf->h * sdlSurf->pitch);
+            // SDL_memset(pixels, cClearColor, sdlSurf->h * sdlSurf->pitch);
+            SDL_memset4(pixels, cClearColor, sdlSurf->w * sdlSurf->h);
             SDL_UnlockSurface(sdlSurf);
             bClear = false;
         }
@@ -427,7 +430,6 @@ namespace rpge {
                     if(isVisible) {
 
                         const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
-                        int totalHeight    = drawEnd - drawStart;
                         bool isSolidColor  = tex == nullptr;
 
                         // Compute normalized horizontal position on the wall plane
@@ -458,7 +460,7 @@ namespace rpge {
                             if(isSolidColor) {
                                 SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurf->format, &tr, &tg, &tb, &ta);
                             } else {
-                                float planeVertical = 1.0f - (h - drawStart) / (float)totalHeight;
+                                float planeVertical = (drawEnd - h) / (drawEnd - (int)drawStart);
                                 SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical), sdlSurf->format, &tr, &tg, &tb, &ta);
                             }
 
@@ -520,23 +522,23 @@ namespace rpge {
             #ifdef DEBUG
             
             // Draw exclusions start and end coordinates in debugging purposes
-            SDL_LockSurface(sdlSurface);
+            SDL_LockSurface(sdlSurf);
             for(const pair<int, int>& excl : drawExcls) {
                 for(int c = 0; c < iColumnsPerRay; c++) {
                     int hor = c + column;
-                    if(hor < 0 || hor >= sdlSurface->w)
+                    if(hor < 0 || hor >= sdlSurf->w)
                         break;
                     for(int r = 0; r < iRowsInterval; r++) {
 
                         int verS = excl.first + r - 1;
-                        if(verS < 0 || verS >= sdlSurface->h)
+                        if(verS < 0 || verS >= sdlSurf->h)
                             break;
-                        pixels[hor + verS * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 0, 255, 0);
+                        pixels[hor + verS * sdlSurf->w] = SDL_MapRGB(sdlSurf->format, 0, 255, 0);
 
                         int verE = excl.second + r - 1;
-                        if(verE < 0 || verE >= sdlSurface->h)
+                        if(verE < 0 || verE >= sdlSurf->h)
                             break;
-                        pixels[hor + verE * sdlSurface->w] = SDL_MapRGB(sdlSurface->format, 255, 0, 0);
+                        pixels[hor + verE * sdlSurf->w] = SDL_MapRGB(sdlSurf->format, 255, 0, 0);
 
                     }
                 }
@@ -545,10 +547,10 @@ namespace rpge {
             // Perform one-time actions when column is nearly at the center of the screen
             if(!centerDebugDone && abs(column - iScreenWidth / 2) <= iColumnsPerRay) {
                 for(int i = rRenderArea.y; i < rRenderArea.h + rRenderArea.y; i++)
-                    pixels[iScreenWidth / 2 + i * sdlSurface->w] = 0xffffff;
+                    pixels[iScreenWidth / 2 + i * sdlSurf->w] = 0xffffff;
                 centerDebugDone = true;
             }
-            SDL_UnlockSurface(sdlSurface);
+            SDL_UnlockSurface(sdlSurf);
 
             #endif
         }
