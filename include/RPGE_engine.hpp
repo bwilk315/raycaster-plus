@@ -30,9 +30,9 @@ namespace rpge {
         UP     // Key is not pressed anymore (single event)
     };
     enum RenderFitMode {
-        UNKNOWN,
         STRETCH, // Render gets stretched to fill the whole screen area
-        SQUARE   // Render is the biggest square possible to fit with the current resolution
+        SQUARE,  // Render is the biggest square possible to fit with the current resolution
+        CUSTOM   // Render is screen area defined by rectangle set using `setRenderArea`
     };
 
     struct ColumnDrawInfo {
@@ -87,8 +87,8 @@ namespace rpge {
             Engine(int screenWidth, int screenHeight);
             ~Engine();
 
-            /* Sets all pixels' channels to `r`, `g` and `b` respectively, once per frame */
-            void                   clear(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0);
+            /* Sets all render area pixels' color to the one set before using `setClearColor` method */
+            void                   clear();
 
             const SDL_PixelFormat* getColorFormat() const;
 
@@ -128,6 +128,9 @@ namespace rpge {
             /* Frees allocated memory, then sets the stop flag which makes `tick` method unavailable */
             void                   stop();
 
+            /* Screen pixels' will have their RGB channels set to these on clearing with `clear` method */
+            void                   setClearColor(uint8_t r, uint8_t g, uint8_t b);
+
             /* The `locked` flag enables/disables periodical cursor position reset to the center of screen */
             void                   setCursorLock(bool locked);
 
@@ -149,6 +152,9 @@ namespace rpge {
             /* Updates the main camera pointer so it points the `camera` instance of class `Camera`. It is used
                in rendering process. */
             void                   setMainCamera(const Camera* camera);
+
+            /* Specifies which part of the screen is used to render frames */
+            void                   setRenderArea(const SDL_Rect& rect);
 
             /* Sets behavior of the render area to `rfm` (see description of `RenderFitMode` for more details) */
             void                   setRenderFitMode(const RenderFitMode& rfm);

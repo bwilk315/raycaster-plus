@@ -40,7 +40,7 @@ namespace rpge {
 
             /* Returns color of the pixel at normalized coordinates `u` (horizontal) and `v` (vertical).
              * Coordinate (0, 0) is the bottom-left corner, while (1, 1) is the top-right corner.
-             * Exceeding <0;1> limit range of values for `u` and `v` results in them cycling, for example
+             * Exceeding <0;1) limit range of values for `u` and `v` results in them cycling, for example
              * if you provide u=1.1 and v=-0.2, it gets translated into u=0.1 and v=0.8 */
             uint32_t getCoords(float u, float v) const noexcept;
 

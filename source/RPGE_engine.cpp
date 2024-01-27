@@ -46,7 +46,7 @@ namespace rpge {
         this->fAspectRatio       = iScreenHeight / (float)iScreenWidth;
         this->cClearColor        = 0;
         this->frameIndex         = 0;
-        this->renderFitMode      = RenderFitMode::UNKNOWN;
+        this->renderFitMode      = RenderFitMode::SQUARE;
         this->vLightDir          = Vector2::RIGHT;
         this->tpLast             = system_clock::now();
         this->elapsedTime        = duration<float>(0);
@@ -81,8 +81,7 @@ namespace rpge {
             SDL_Quit();
         }
     }
-    void Engine::clear(uint8_t r, uint8_t g, uint8_t b) {
-        cClearColor = SDL_MapRGB(sdlSurf->format, r, g, b);
+    void Engine::clear() {
         bClear = true;
     }
     const SDL_PixelFormat* Engine::getColorFormat() const {
@@ -90,6 +89,9 @@ namespace rpge {
     }
     void Engine::stop() {
         bRun = false;
+    }
+    void Engine::setClearColor(uint8_t r, uint8_t g, uint8_t b) {
+        cClearColor = SDL_MapRGB(sdlSurf->format, r, g, b);
     }
     void Engine::setCursorLock(bool locked) {
         bIsCursorLocked = locked;
@@ -111,36 +113,44 @@ namespace rpge {
     void Engine::setMainCamera(const Camera* camera) {
         mainCamera = camera;
     }
+    void Engine::setRenderArea(const SDL_Rect& rect) {
+        rRenderArea.w = clamp(rect.w, 0, iScreenWidth);
+        rRenderArea.h = clamp(rect.h, 0, iScreenHeight);
+        rRenderArea.x = clamp(rect.x, 0, iScreenWidth - rRenderArea.w);
+        rRenderArea.y = clamp(rect.y, 0, iScreenHeight - rRenderArea.h);
+    }
     void Engine::setRowsInterval(int n) {
         iRowsInterval = clamp(n, 1, rRenderArea.h);
     }
     void Engine::setRenderFitMode(const RenderFitMode& rfm) {
-        if(mainCamera == nullptr && rfm != RenderFitMode::UNKNOWN) {
+        if(mainCamera == nullptr) {
             iError |= E_MAIN_CAMERA_NOT_SET;
             return;
         }
         renderFitMode = rfm;
         switch(rfm) {
             case RenderFitMode::STRETCH:
-                rRenderArea = { 0, 0, iScreenWidth, iScreenHeight };
+                setRenderArea({ 0, 0, iScreenWidth, iScreenHeight });
                 break;
             case RenderFitMode::SQUARE:
                 // Set up horizontal and vertical offsets for drawing columns to make the rendered
                 // frame always form a square.
                 if(iScreenWidth > iScreenHeight)
-                    rRenderArea = {
+                    setRenderArea({
                         (iScreenWidth - iScreenHeight) / 2,
                         0,
                         iScreenHeight,
                         iScreenHeight
-                    };
+                    });
                 else
-                    rRenderArea = {
+                    setRenderArea({
                         0,
                         (iScreenHeight - iScreenWidth) / 2,
                         iScreenWidth,
                         iScreenWidth
-                    };
+                    });
+                break;
+            case RenderFitMode::CUSTOM:
                 break;
         }
     }
@@ -249,8 +259,11 @@ namespace rpge {
         // Clear the entire screen buffer if requested
         if(bClear) {
             SDL_LockSurface(sdlSurf);
-            // SDL_memset(pixels, cClearColor, sdlSurf->h * sdlSurf->pitch);
-            SDL_memset4(pixels, cClearColor, sdlSurf->w * sdlSurf->h);
+
+// TODO: Find better way for clearing, so those that did not got drawn during the previous frame are skipped
+//       One way to approach this is to take a rectangle containing all drawn pixels (with some not-drawn but better
+//       something than nothing).
+            SDL_FillRect(sdlSurf, &rRenderArea, cClearColor);
             SDL_UnlockSurface(sdlSurf);
             bClear = false;
         }
@@ -436,7 +449,9 @@ namespace rpge {
                         float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
                         if(flipped)
                             planeHorizontal = 1 - planeHorizontal;
-
+                        
+// TODO: Sometimes pixels are outstanding at the beginning and the end, only vertically
+                        bool lineUp = false; // Flag set to complete pixels left after jumping (not following the way of stepping)
                         for(int h = dbStart; h < dbEnd; h++) {
 
                             // Perform jumping if neccessary, if it is then find the next exclusion range below the current one
@@ -448,12 +463,17 @@ namespace rpge {
                                     else
                                         break;
                                 }
+                                lineUp = true;
                                 continue;
                             }
                             // Actual drawing is done according to rows interval setting, however it is implemented in this specific
                             // form to properly recognize when loop enters exclusion range (if statement above evaluates to true).
-                            if(h % iRowsInterval != 0)
-                                continue;
+                            if(h % iRowsInterval != 0) {
+                                if(!lineUp)
+                                    continue;
+                            } else {
+                                lineUp = false;
+                            }
 
                             // Obtain the current texture pixel color if there is any texture, otherwise use the wall `tint`
                             uint8_t tr, tg, tb, ta;
@@ -461,7 +481,7 @@ namespace rpge {
                                 SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurf->format, &tr, &tg, &tb, &ta);
                             } else {
                                 float planeVertical = (drawEnd - h) / (drawEnd - (int)drawStart);
-                                SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical), sdlSurf->format, &tr, &tg, &tb, &ta);
+                                SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical - 0.001f), sdlSurf->format, &tr, &tg, &tb, &ta);
                             }
 
                             // If pixel is transparent in any level, do not draw it
