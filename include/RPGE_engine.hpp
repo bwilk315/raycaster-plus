@@ -67,6 +67,7 @@ namespace rpge {
             Vector2                  vLightDir;
             time_point<system_clock> tpLast;
             duration<float>          elapsedTime;
+            SDL_Rect                 rClearArea;
             SDL_Rect                 rRenderArea;
             map<int, KeyState>       keyStates; // SDL Scancode -> State of that key
 
@@ -104,6 +105,9 @@ namespace rpge {
             
             /* Returns state of a keyboard key having scancode `sc` (see `KeyState` for more details) */
             KeyState               getKeyState(int sc) const;
+
+            /* Returns mouse position in the screen coordinates */
+            Vector2                getMousePosition() const;
 
             /* Returns area of the screen (in pixels) which is occupied by the render, it depends on the fit mode
                set using `setRenderFitMode` method. */
@@ -153,7 +157,11 @@ namespace rpge {
                in rendering process. */
             void                   setMainCamera(const Camera* camera);
 
-            /* Specifies which part of the screen is used to render frames */
+            /* Specifies which part of the screen should be cleared when calling `clear` method */
+            void                   setClearArea(const SDL_Rect& rect);
+
+            /* Specifies which part of the screen is used to render frames, when calling `render` method.
+             * This method resets clear area set previously using `setClearArea` method to the whole render area. */
             void                   setRenderArea(const SDL_Rect& rect);
 
             /* Sets behavior of the render area to `rfm` (see description of `RenderFitMode` for more details) */

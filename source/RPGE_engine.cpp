@@ -50,6 +50,7 @@ namespace rpge {
         this->vLightDir          = Vector2::RIGHT;
         this->tpLast             = system_clock::now();
         this->elapsedTime        = duration<float>(0);
+        this->rClearArea         = {};
         this->rRenderArea        = {};
         this->keyStates          = map<int, KeyState>();
 
@@ -113,11 +114,19 @@ namespace rpge {
     void Engine::setMainCamera(const Camera* camera) {
         mainCamera = camera;
     }
+    void Engine::setClearArea(const SDL_Rect& rect) {
+        // 400 400 200 200
+        rClearArea.w = clamp(rect.w, 0, rRenderArea.w);
+        rClearArea.h = clamp(rect.h, 0, rRenderArea.h);
+        rClearArea.x = clamp(rect.x, rRenderArea.x, rRenderArea.x + rRenderArea.w - rClearArea.w);
+        rClearArea.y = clamp(rect.y, rRenderArea.y, rRenderArea.y + rRenderArea.h - rClearArea.h);
+    }
     void Engine::setRenderArea(const SDL_Rect& rect) {
         rRenderArea.w = clamp(rect.w, 0, iScreenWidth);
         rRenderArea.h = clamp(rect.h, 0, iScreenHeight);
         rRenderArea.x = clamp(rect.x, 0, iScreenWidth - rRenderArea.w);
         rRenderArea.y = clamp(rect.y, 0, iScreenHeight - rRenderArea.h);
+        setClearArea(rRenderArea);
     }
     void Engine::setRowsInterval(int n) {
         iRowsInterval = clamp(n, 1, rRenderArea.h);
@@ -177,6 +186,11 @@ namespace rpge {
     }
     KeyState Engine::getKeyState(int sc) const {
         return keyStates.count(sc) == 0 ? KeyState::NONE : keyStates.at(sc);
+    }
+    Vector2 Engine::getMousePosition() const {
+        int x, y;
+        SDL_GetMouseState(&x, &y);
+        return Vector2(x, y);
     }
     DDA* Engine::getWalker() {
         return walker;
@@ -256,14 +270,10 @@ namespace rpge {
         const float planeSlope = planeVec.y / planeVec.x;
         LinearFunc planeLine(planeSlope, camPos.y - planeSlope * camPos.x, 0, 1);
 
-        // Clear the entire screen buffer if requested
+        // Clear the specified part of screen buffer if requested
         if(bClear) {
             SDL_LockSurface(sdlSurf);
-
-// TODO: Find better way for clearing, so those that did not got drawn during the previous frame are skipped
-//       One way to approach this is to take a rectangle containing all drawn pixels (with some not-drawn but better
-//       something than nothing).
-            SDL_FillRect(sdlSurf, &rRenderArea, cClearColor);
+            SDL_FillRect(sdlSurf, &rClearArea, cClearColor);
             SDL_UnlockSurface(sdlSurf);
             bClear = false;
         }
