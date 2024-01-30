@@ -46,12 +46,11 @@ namespace rpge {
         this->fAspectRatio       = iScreenHeight / (float)iScreenWidth;
         this->cClearColor        = 0;
         this->frameIndex         = 0;
-        this->renderFitMode      = RenderFitMode::SQUARE;
         this->vLightDir          = Vector2::RIGHT;
         this->tpLast             = system_clock::now();
         this->elapsedTime        = duration<float>(0);
-        this->rClearArea         = {};
-        this->rRenderArea        = {};
+        this->rClearArea         = { 0, 0, iScreenWidth, iScreenHeight };
+        this->rRenderArea        = rClearArea;
         this->keyStates          = map<int, KeyState>();
 
         if(SDL_InitSubSystem(SDL_INIT_VIDEO) == 0) {
@@ -115,7 +114,6 @@ namespace rpge {
         mainCamera = camera;
     }
     void Engine::setClearArea(const SDL_Rect& rect) {
-        // 400 400 200 200
         rClearArea.w = clamp(rect.w, 0, rRenderArea.w);
         rClearArea.h = clamp(rect.h, 0, rRenderArea.h);
         rClearArea.x = clamp(rect.x, rRenderArea.x, rRenderArea.x + rRenderArea.w - rClearArea.w);
@@ -130,38 +128,6 @@ namespace rpge {
     }
     void Engine::setRowsInterval(int n) {
         iRowsInterval = clamp(n, 1, rRenderArea.h);
-    }
-    void Engine::setRenderFitMode(const RenderFitMode& rfm) {
-        if(mainCamera == nullptr) {
-            iError |= E_MAIN_CAMERA_NOT_SET;
-            return;
-        }
-        renderFitMode = rfm;
-        switch(rfm) {
-            case RenderFitMode::STRETCH:
-                setRenderArea({ 0, 0, iScreenWidth, iScreenHeight });
-                break;
-            case RenderFitMode::SQUARE:
-                // Set up horizontal and vertical offsets for drawing columns to make the rendered
-                // frame always form a square.
-                if(iScreenWidth > iScreenHeight)
-                    setRenderArea({
-                        (iScreenWidth - iScreenHeight) / 2,
-                        0,
-                        iScreenHeight,
-                        iScreenHeight
-                    });
-                else
-                    setRenderArea({
-                        0,
-                        (iScreenHeight - iScreenWidth) / 2,
-                        iScreenWidth,
-                        iScreenWidth
-                    });
-                break;
-            case RenderFitMode::CUSTOM:
-                break;
-        }
     }
     void Engine::render() {
         bRedraw = true;
@@ -254,9 +220,6 @@ namespace rpge {
         /********************************************/
         /********************************************/
 
-
-        const int rhStart = rRenderArea.y;
-        const int rhEnd   = rRenderArea.y + rRenderArea.h;
         // Perspective-correct minimum distance; if you stand this distance from the cube looking at it orthogonally,
         // entire vertical view of the camera should be occupied by the cube front wall. This assumes that camera is
         // located at height of 1/2.
@@ -405,14 +368,14 @@ namespace rpge {
 
                     // Find out range describing how column should be drawn for the current wall
                     float lineHeight = rRenderArea.h * (pcmDist / cdi->perpDist);
-                    float drawStart  = rhStart + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
-                    float drawEnd    = rhStart + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
+                    float drawStart  = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
+                    float drawEnd    = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
 
                     // Prepare for examining exclusion ranges, find drawable start and height coordinates (meaning they
                     // are able to be displayed in the render area).    
                     bool isVisible = true;
-                    int dbStart    = clamp((int)drawStart, rhStart, rhEnd);
-                    int dbEnd      = clamp((int)drawEnd,   rhStart, rhEnd);
+                    int dbStart    = clamp((int)drawStart, rRenderArea.y, rRenderArea.y + rRenderArea.h);
+                    int dbEnd      = clamp((int)drawEnd,   rRenderArea.y, rRenderArea.y + rRenderArea.h);
                     int exclCount  = drawExcls.size();
                     int jumpIndex  = -1;     // Index of exclusion that is going to limit drawing first
                     pair<int, int> jumpExcl; // Initial content at the index `jumpIndex`, it gets dynamically updated later
@@ -459,8 +422,7 @@ namespace rpge {
                         float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
                         if(flipped)
                             planeHorizontal = 1 - planeHorizontal;
-                        
-// TODO: Sometimes pixels are outstanding at the beginning and the end, only vertically
+
                         bool lineUp = false; // Flag set to complete pixels left after jumping (not following the way of stepping)
                         for(int h = dbStart; h < dbEnd; h++) {
 
@@ -513,11 +475,11 @@ namespace rpge {
                             uint32_t color = SDL_MapRGB(sdlSurf->format, tr, tg, tb);
                             for(int c = 0; c != iColumnsPerRay; c++) {
                                 int hor = c + column;
-                                if(hor < 0 || hor >= sdlSurf->w)
+                                if(hor < rRenderArea.x || hor >= rRenderArea.x + rRenderArea.w)
                                     break;
                                 for(int r = 0; r != iRowsInterval; r++) {
-                                    int ver = h + r - 1;
-                                    if(ver < 0 || ver >= sdlSurf->h)
+                                    int ver = h + r;
+                                    if(ver < rRenderArea.y || ver >= rRenderArea.y + rRenderArea.h)
                                         break;
                                     
                                     pixels[hor + ver * sdlSurf->w] = color;

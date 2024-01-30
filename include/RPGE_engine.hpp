@@ -29,11 +29,6 @@ namespace rpge {
         PRESS, // Key is pressed
         UP     // Key is not pressed anymore (single event)
     };
-    enum RenderFitMode {
-        STRETCH, // Render gets stretched to fill the whole screen area
-        SQUARE,  // Render is the biggest square possible to fit with the current resolution
-        CUSTOM   // Render is screen area defined by rectangle set using `setRenderArea`
-    };
 
     struct ColumnDrawInfo {
         float           perpDist;    // Perpendicular distance from wall hit point to the camera plane
@@ -63,7 +58,6 @@ namespace rpge {
             float                    fAspectRatio;
             uint32_t                 cClearColor;
             uint64_t                 frameIndex;
-            RenderFitMode            renderFitMode;
             Vector2                  vLightDir;
             time_point<system_clock> tpLast;
             duration<float>          elapsedTime;
@@ -163,9 +157,6 @@ namespace rpge {
             /* Specifies which part of the screen is used to render frames, when calling `render` method.
              * This method resets clear area set previously using `setClearArea` method to the whole render area. */
             void                   setRenderArea(const SDL_Rect& rect);
-
-            /* Sets behavior of the render area to `rfm` (see description of `RenderFitMode` for more details) */
-            void                   setRenderFitMode(const RenderFitMode& rfm);
 
             /* Makes one column pixel provide data for next `n` of them, so there will be total of `columnHeight / n` pixels */
             void                   setRowsInterval(int n);
