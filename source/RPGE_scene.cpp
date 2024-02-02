@@ -68,7 +68,7 @@ namespace rpge {
     int Scene::posAsDataIndex(int x, int y) const {
         return width * (height - y - 1) + x;
     }
-    Scene::Scene(const SDL_PixelFormat* colorFormat) {
+    Scene::Scene() {
         this->error = E_CLEAR;
         this->width = 0;
         this->height = 0;
@@ -77,14 +77,13 @@ namespace rpge {
         this->texSources = map<int, Texture>();
         this->texIds = map<string, int>();
         this->tileIds = vector<int>();
-        this->colorFormat = colorFormat;
     }
-    Scene::Scene(const SDL_PixelFormat* colorFormat, int width, int height) : Scene(colorFormat) {
+    Scene::Scene(int width, int height) : Scene() {
         this->width = width;
         this->height = height;
         this->tiles = new int[width * height];
     }
-    Scene::Scene(const SDL_PixelFormat* colorFormat, const string& file) : Scene(colorFormat) {
+    Scene::Scene(const string& file) : Scene() {
         loadFromFile(file);
     }
     Scene::~Scene() {
@@ -162,7 +161,7 @@ namespace rpge {
             return texIds.at(pngFile);
         // Add a new texture entry, if loading failed then erase it, returns the texture ID
         int id = texIds.size() + 1;
-        texSources.insert(pair<int, Texture>(id, Texture(colorFormat)));
+        texSources.insert(pair<int, Texture>(id, Texture()));
         texSources.at(id).loadFromFile(pngFile);
         if(texSources.at(id).getError()) {
             texSources.erase(id);
@@ -283,8 +282,7 @@ namespace rpge {
                                 stof(args.at(8)),
                                 stof(args.at(9))
                             ),
-                            SDL_MapRGBA(
-                                colorFormat,
+                            enColor(
                                 (uint8_t)stof(args.at(15)),
                                 (uint8_t)stof(args.at(16)),
                                 (uint8_t)stof(args.at(17)),

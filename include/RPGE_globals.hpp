@@ -10,6 +10,7 @@
 #ifdef DEBUG
 #include <iostream>
 #endif
+#include <cstdint>
 #include <sstream>
 #include <string>
 
@@ -31,6 +32,9 @@ namespace rpge {
     /* Checks whether given string `text` is a floating point number in any form, for example
      * number 100.23 can be written in scienfitic notation as 1.0023e+2, both are considered floats. */
     bool  isFloat(const string& text);
+
+    uint32_t enColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
+    void deColor(uint32_t color, uint8_t& r, uint8_t& g, uint8_t& b, uint8_t& a);
 }
 
 #endif

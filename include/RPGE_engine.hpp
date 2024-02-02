@@ -56,7 +56,7 @@ namespace rpge {
             int                      iScreenWidth;
             int                      iScreenHeight;
             float                    fAspectRatio;
-            uint32_t                 cClearColor;
+            SDL_Color                cClearColor;
             uint64_t                 frameIndex;
             Vector2                  vLightDir;
             time_point<system_clock> tpLast;
@@ -65,10 +65,9 @@ namespace rpge {
             SDL_Rect                 rRenderArea;
             map<int, KeyState>       keyStates; // SDL Scancode -> State of that key
 
-            uint32_t*     pixels; // Array of window surface pixels
             const Camera* mainCamera;
             DDA*          walker;
-            SDL_Surface*  sdlSurf;
+            SDL_Renderer* sdlRend;
             SDL_Window*   sdlWindow;
 
         public:
@@ -84,8 +83,6 @@ namespace rpge {
 
             /* Sets all render area pixels' color to the one set before using `setClearColor` method */
             void                   clear();
-
-            const SDL_PixelFormat* getColorFormat() const;
 
             /* Returns an overall error code that in binary form represents whether some error occurred (1) or not (0),
                see `E_<error_name>` constants for more details about individual errors. */ 
@@ -106,6 +103,9 @@ namespace rpge {
             /* Returns area of the screen (in pixels) which is occupied by the render, it depends on the fit mode
                set using `setRenderFitMode` method. */
             SDL_Rect               getRenderArea() const;
+
+            /* Returns pointer to the SDL renderer structure */
+            SDL_Renderer*          getRendererHandle();
 
             /* Returns current height of the screen in pixels */
             int                    getScreenHeight() const;

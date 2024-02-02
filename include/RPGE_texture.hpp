@@ -24,7 +24,7 @@ namespace rpge {
             int                    width;
             int                    height;
             uint32_t*              pixels;
-            const SDL_PixelFormat* format;
+            
         public:
             enum {
                 E_CLEAR,
@@ -34,8 +34,8 @@ namespace rpge {
                 E_INVALID_POSITION
             };
 
-            Texture(const SDL_PixelFormat* format);
-            Texture(const SDL_PixelFormat* format, const string& pngFile);
+            Texture();
+            Texture(const string& pngFile);
             ~Texture();
 
             /* Returns color of the pixel at normalized coordinates `u` (horizontal) and `v` (vertical).

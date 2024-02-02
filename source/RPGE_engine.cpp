@@ -44,7 +44,7 @@ namespace rpge {
         this->iScreenWidth       = screenWidth < 1 ? 1 : screenWidth;
         this->iScreenHeight      = screenHeight < 1 ? 1 : screenHeight;
         this->fAspectRatio       = iScreenHeight / (float)iScreenWidth;
-        this->cClearColor        = 0;
+        this->cClearColor        = { 0, 0, 0, 255 };
         this->frameIndex         = 0;
         this->vLightDir          = Vector2::RIGHT;
         this->tpLast             = system_clock::now();
@@ -54,17 +54,14 @@ namespace rpge {
         this->keyStates          = map<int, KeyState>();
 
         if(SDL_InitSubSystem(SDL_INIT_VIDEO) == 0) {
-            this->pixels     = nullptr;
             this->mainCamera = nullptr;
             this->walker     = new DDA();
-            this->sdlSurf    = nullptr;
             this->sdlWindow  = SDL_CreateWindow("Raycaster Plus Engine", 0, 0, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
             if(sdlWindow != nullptr) {
-                this->sdlSurf = SDL_GetWindowSurface(sdlWindow);
-                if(sdlSurf != nullptr) {
+                this->sdlRend = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED);
+                if(sdlRend != nullptr) {
                     // Everything is OK
                     SDL_SetWindowResizable(this->sdlWindow, SDL_FALSE);
-                    pixels = (uint32_t*)sdlSurf->pixels;
                     return;
                 }
             }
@@ -84,14 +81,13 @@ namespace rpge {
     void Engine::clear() {
         bClear = true;
     }
-    const SDL_PixelFormat* Engine::getColorFormat() const {
-        return sdlSurf == nullptr ? nullptr : sdlSurf->format;
-    }
     void Engine::stop() {
         bRun = false;
     }
     void Engine::setClearColor(uint8_t r, uint8_t g, uint8_t b) {
-        cClearColor = SDL_MapRGB(sdlSurf->format, r, g, b);
+        cClearColor.r = r;
+        cClearColor.g = g;
+        cClearColor.b = b;
     }
     void Engine::setCursorLock(bool locked) {
         bIsCursorLocked = locked;
@@ -149,6 +145,9 @@ namespace rpge {
     }
     SDL_Rect Engine::getRenderArea() const {
         return rRenderArea;
+    }
+    SDL_Renderer* Engine::getRendererHandle() {
+        return sdlRend;
     }
     KeyState Engine::getKeyState(int sc) const {
         return keyStates.count(sc) == 0 ? KeyState::NONE : keyStates.at(sc);
@@ -235,9 +234,8 @@ namespace rpge {
 
         // Clear the specified part of screen buffer if requested
         if(bClear) {
-            SDL_LockSurface(sdlSurf);
-            SDL_FillRect(sdlSurf, &rClearArea, cClearColor);
-            SDL_UnlockSurface(sdlSurf);
+            SDL_SetRenderDrawColor(sdlRend, cClearColor.r, cClearColor.g, cClearColor.b, cClearColor.a);
+            SDL_RenderFillRect(sdlRend, &rClearArea);
             bClear = false;
         }
         // Skip drawing process if redrawing is not requested
@@ -423,6 +421,9 @@ namespace rpge {
                         if(flipped)
                             planeHorizontal = 1 - planeHorizontal;
 
+// TODO: Upgrade drawing system so it is GPU-friendly, e.g. now drawing is done by jumping static amount of pixels (given column
+// per ray and rows per ray count) and it gets laggy when too many pixels needs to be rendered. With acceleration CPU will only
+// need to tell GPU how to draw a line and of which color which is far better, e.g. considering looking at wall from close range.
                         bool lineUp = false; // Flag set to complete pixels left after jumping (not following the way of stepping)
                         for(int h = dbStart; h < dbEnd; h++) {
 
@@ -450,10 +451,12 @@ namespace rpge {
                             // Obtain the current texture pixel color if there is any texture, otherwise use the wall `tint`
                             uint8_t tr, tg, tb, ta;
                             if(isSolidColor) {
-                                SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurf->format, &tr, &tg, &tb, &ta);
+                                //SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurf->format, &tr, &tg, &tb, &ta);
+                                deColor(cdi->wallDataPtr->tint, tr, tg, tb, ta);
                             } else {
                                 float planeVertical = (drawEnd - h) / (drawEnd - (int)drawStart);
-                                SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical - 0.001f), sdlSurf->format, &tr, &tg, &tb, &ta);
+                                //SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical - 0.001f), sdlSurf->format, &tr, &tg, &tb, &ta);
+                                deColor(tex->getCoords(planeHorizontal, planeVertical - 0.001f), tr, tg, tb, ta);
                             }
 
                             // If pixel is transparent in any level, do not draw it
@@ -470,22 +473,10 @@ namespace rpge {
                                 tb *= bn;
                             }
 
-                            // Draw pixel(s) to the buffer. Amount of drawn pixels depends on columns-per-ray and rows interval settings
-                            SDL_LockSurface(sdlSurf);
-                            uint32_t color = SDL_MapRGB(sdlSurf->format, tr, tg, tb);
-                            for(int c = 0; c != iColumnsPerRay; c++) {
-                                int hor = c + column;
-                                if(hor < rRenderArea.x || hor >= rRenderArea.x + rRenderArea.w)
-                                    break;
-                                for(int r = 0; r != iRowsInterval; r++) {
-                                    int ver = h + r;
-                                    if(ver < rRenderArea.y || ver >= rRenderArea.y + rRenderArea.h)
-                                        break;
-                                    
-                                    pixels[hor + ver * sdlSurf->w] = color;
-                                }
-                            }
-                            SDL_UnlockSurface(sdlSurf);
+                            // Draw settings-compliant pixel
+                            SDL_Rect pixel = { column, h, iColumnsPerRay, iRowsInterval };
+                            SDL_SetRenderDrawColor(sdlRend, tr, tg, tb, ta);
+                            SDL_RenderFillRect(sdlRend, &pixel);
                         }
 
                         // Append new exclusion, do it so vector remains sorted according to exclusions' start coordinate
@@ -512,37 +503,8 @@ namespace rpge {
             }
 
             #ifdef DEBUG
-            
-            // Draw exclusions start and end coordinates in debugging purposes
-            SDL_LockSurface(sdlSurf);
-            for(const pair<int, int>& excl : drawExcls) {
-                for(int c = 0; c < iColumnsPerRay; c++) {
-                    int hor = c + column;
-                    if(hor < 0 || hor >= sdlSurf->w)
-                        break;
-                    for(int r = 0; r < iRowsInterval; r++) {
 
-                        int verS = excl.first + r - 1;
-                        if(verS < 0 || verS >= sdlSurf->h)
-                            break;
-                        pixels[hor + verS * sdlSurf->w] = SDL_MapRGB(sdlSurf->format, 0, 255, 0);
-
-                        int verE = excl.second + r - 1;
-                        if(verE < 0 || verE >= sdlSurf->h)
-                            break;
-                        pixels[hor + verE * sdlSurf->w] = SDL_MapRGB(sdlSurf->format, 255, 0, 0);
-
-                    }
-                }
-            }
-
-            // Perform one-time actions when column is nearly at the center of the screen
-            if(!centerDebugDone && abs(column - iScreenWidth / 2) <= iColumnsPerRay) {
-                for(int i = rRenderArea.y; i < rRenderArea.h + rRenderArea.y; i++)
-                    pixels[iScreenWidth / 2 + i * sdlSurf->w] = 0xffffff;
-                centerDebugDone = true;
-            }
-            SDL_UnlockSurface(sdlSurf);
+// TODO: Create more sophisticated visual tools for debugging here
 
             #endif
         }
@@ -564,7 +526,7 @@ namespace rpge {
         SDL_Delay(delay); // Maybe this causes the lag when unfreezing?
 
         if(bRedraw) {
-            SDL_UpdateWindowSurface(sdlWindow);
+            SDL_RenderPresent(sdlRend);
             bRedraw = false;
         }
         frameIndex++;

@@ -7,15 +7,14 @@ namespace rpge {
     /********** CLASS: TEXTURE **********/
     /************************************/
 
-    Texture::Texture(const SDL_PixelFormat* format) {
+    Texture::Texture() {
         this->loaded = false;
         this->error  = E_CLEAR;
         this->width  = 0;
         this->height = 0;
         this->pixels = nullptr;
-        this->format = format;
     }
-    Texture::Texture(const SDL_PixelFormat* format, const string& pngFile) : Texture(format) {
+    Texture::Texture(const string& pngFile) : Texture() {
         loadFromFile(pngFile);
     }
     Texture::~Texture() {
@@ -50,8 +49,7 @@ namespace rpge {
                     delete[] pixels;
                 this->pixels = new uint32_t[size / 4];
                 for(int i = 0; i < size; i += 4) {
-                    this->pixels[i / 4] = SDL_MapRGBA(
-                        format,
+                    this->pixels[i / 4] = enColor(
                         bytes[i + 0],
                         bytes[i + 1],
                         bytes[i + 2],

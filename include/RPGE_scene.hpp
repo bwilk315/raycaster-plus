@@ -63,7 +63,6 @@ namespace rpge {
             map<int, Texture> texSources;         // Texture ID -> Texture source object
             map<string, int> texIds;              // File name -> Texture ID
             vector<int> tileIds;                  // All types of tile IDs
-            const SDL_PixelFormat* colorFormat;
 
             // Returns index in the tiles array that corresponds to the specified position
             int posAsDataIndex(int x, int y) const;
@@ -78,9 +77,9 @@ namespace rpge {
                 E_RPS_UNKNOWN_STRING_FORMAT    // Caused by not following string notation where needed
             };
 
-            Scene(const SDL_PixelFormat* colorFormat);
-            Scene(const SDL_PixelFormat* colorFormat, int width, int height);
-            Scene(const SDL_PixelFormat* colorFormat, const string& rpsFile);
+            Scene();
+            Scene(int width, int height);
+            Scene(const string& rpsFile);
             ~Scene();
 
             /* Returns if tile location ( `x`, `y` ) is included in the scene bounds */
