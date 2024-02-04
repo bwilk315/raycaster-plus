@@ -349,7 +349,6 @@ namespace rpge {
                 /********** COLUMN DRAWING USING COLLECTED WALLS DRAWING INFORMATION **********/
                 /******************************************************************************/
 
-
                 for(int i = 0; i != dipLen; i++) {
                     ColumnDrawInfo* cdi = drawInfoPtrs[i];
 
@@ -366,130 +365,164 @@ namespace rpge {
 
                     // Find out range describing how column should be drawn for the current wall
                     float lineHeight = rRenderArea.h * (pcmDist / cdi->perpDist);
-                    float drawStart  = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
-                    float drawEnd    = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
+                    int drawStart  = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
+                    int drawEnd    = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
 
-                    // Prepare for examining exclusion ranges, find drawable start and height coordinates (meaning they
-                    // are able to be displayed in the render area).    
-                    bool isVisible = true;
-                    int dbStart    = clamp((int)drawStart, rRenderArea.y, rRenderArea.y + rRenderArea.h);
-                    int dbEnd      = clamp((int)drawEnd,   rRenderArea.y, rRenderArea.y + rRenderArea.h);
-                    int exclCount  = drawExcls.size();
-                    int jumpIndex  = -1;     // Index of exclusion that is going to limit drawing first
-                    pair<int, int> jumpExcl; // Initial content at the index `jumpIndex`, it gets dynamically updated later
+                    // Obtain information on the wall looks
+                    const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
+                    float texPixelHeight = drawEnd - drawStart;
+                    bool isSolidColor    = true;
+                    if(tex != nullptr) {
+                        texPixelHeight /= (float)tex->getHeight();
+                        isSolidColor    = false;
+                    }
 
-                    // Find index of the first exclusion limiting the drawing range, if there is any
+                    // Compute normalized horizontal position on the wall plane
+                    float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
+                    if(flipped)
+                        planeHorizontal = 1 - planeHorizontal;
+
+                    // Find the first exclusion range after the drawing start coordinate
+                    bool drawable = true;  // Does coordinates allow for valid line drawing?
+                    int exclCount = drawExcls.size();
+                    int lineStart = drawStart;
+                    int lineEnd   = drawEnd;
+                    int neIndex   = -1;  // Next exclusion range index in the `drawExcls` vector
                     for(int e = 0; e < exclCount; e++) {
-                        const pair<int, int>& excl = drawExcls.at(e);
-                        bool startIn = excl.first  > dbStart && excl.first  < dbEnd;
-                        bool endIn   = excl.second > dbStart && excl.second < dbEnd;
+                        const pair<int, int>& ex = drawExcls.at(e);
 
-                        if(startIn && endIn) {
-                            // Exclusion is included in drawing range for the first time.
-                            // Collect its index and finish the loop, it is later used for checking next ones only because
-                            // the exclusions vector is sorted.
-                            if(jumpIndex == -1) {
-                                jumpIndex = e;
-                                jumpExcl  = excl;
+                        bool isNext = true;
+                        bool found  = true;
+                        if(drawStart >= ex.first && drawStart <= ex.second) {
+                            // Start coordinate is included in the exclusion range, move it down
+                            neIndex   = e + 1;
+                            lineStart = ex.second;
+                            if(neIndex == exclCount) {
+                                // There is no next exclusion, end coordinate is unrestricted thus original
+                                neIndex = -1;
+                                isNext  = false;
                             }
-                        } else if(startIn) {
-                            // Only exclusion start is included.
-                            // Shrink the bottom coordinate and perform the loop over again to make sure new coordinate does
-                            // not interfere with anything.
-                            dbEnd = excl.first;
-                            e = 0;
-                        } else if(endIn) {
-                            // Only exclusion end is included.
-                            // Similarly to the `startIn` only (above), shrink the top coordinate and loop over again.
-                            dbStart = excl.second;
-                            e = 0;
-                        } else if(excl.first <= dbStart && excl.second >= dbEnd) {
-                            // Exclusion eats the whole drawing range.
-                            // Therefore the column is not visible by any mean, so skip it.
-                            isVisible = false;
+                        } else if(drawStart <= ex.first) {
+                            // Encountered exclusion below the start coordinate
+                            neIndex   = e;
+                        } else {
+                            found = false;
+                        }
+
+                        if(found) {
+                            if(isNext) {
+                                // Drawing end coordinate is clipped to a next exclusion if it is existent
+                                int neHeight = drawExcls.at(neIndex).first;
+                                lineEnd      = drawEnd < neHeight ? drawEnd : neHeight;
+                            }
+                            drawable = lineStart < lineEnd;
                             break;
                         }
                     }
 
-                    if(isVisible) {
+                    if(drawable) {
 
-                        const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
-                        bool isSolidColor  = tex == nullptr;
-
-                        // Compute normalized horizontal position on the wall plane
-                        float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
-                        if(flipped)
-                            planeHorizontal = 1 - planeHorizontal;
-
-// TODO: Upgrade drawing system so it is GPU-friendly, e.g. now drawing is done by jumping static amount of pixels (given column
-// per ray and rows per ray count) and it gets laggy when too many pixels needs to be rendered. With acceleration CPU will only
-// need to tell GPU how to draw a line and of which color which is far better, e.g. considering looking at wall from close range.
-                        bool lineUp = false; // Flag set to complete pixels left after jumping (not following the way of stepping)
-                        for(int h = dbStart; h < dbEnd; h++) {
-
-                            // Perform jumping if neccessary, if it is then find the next exclusion range below the current one
-                            if(jumpIndex != -1 && h >= jumpExcl.first && h <= jumpExcl.second) {
-                                h = jumpExcl.second;
-                                while(jumpExcl.second <= h) {
-                                    if(++jumpIndex < exclCount)
-                                        jumpExcl = drawExcls.at(jumpIndex);
-                                    else
-                                        break;
+                        // Draw the line with exclusions taken into account
+                        pair<int, int> next = neIndex == -1 ? make_pair(0, 0) : drawExcls.at(neIndex);
+                        while(true) {
+                            // Draw drawable part of the line drawing range if possible
+                            int dbLs = clamp(lineStart, rRenderArea.y, rRenderArea.y + rRenderArea.h);
+                            int dbLe = clamp(lineEnd,   rRenderArea.y, rRenderArea.y + rRenderArea.h);
+                            if(dbLs != dbLe) {
+                                
+                                // Find pixel start & end coordinate, then get its color
+                                uint8_t cr, cg, cb, ca;
+                                float planeVertical;
+                                if(isSolidColor) {
+                                    deColor(cdi->wallDataPtr->tint, cr, cg, cb, ca);
+                                } else {
+                                    planeVertical = (drawEnd - dbLs) / (drawEnd - (int)drawStart);
+                                    deColor(tex->getCoords(planeHorizontal, planeVertical - 0.001f), cr, cg, cb, ca);
                                 }
-                                lineUp = true;
-                                continue;
+
+/* TODO: Make it draw a part of the texture instead of drawing lots of lines (CPU inefficient), remake the RPGE_texture.hpp module
+         to use SDL-provided texture utilities (abandon libpng).
+*/
+                                SDL_SetRenderDrawColor(sdlRend, cr, cg, cb, ca);
+                                SDL_RenderDrawLine(sdlRend, column, dbLs, column, dbLe);
                             }
-                            // Actual drawing is done according to rows interval setting, however it is implemented in this specific
-                            // form to properly recognize when loop enters exclusion range (if statement above evaluates to true).
-                            if(h % iRowsInterval != 0) {
-                                if(!lineUp)
-                                    continue;
+
+                            if(neIndex == -1)
+                                break;
+                            
+                            // Hop to another drawable part of the line
+                            lineStart = next.second;
+                            if(++neIndex >= exclCount) {
+                                lineEnd = drawEnd;
+                                neIndex = -1;
                             } else {
-                                lineUp = false;
+                                next    = drawExcls.at(neIndex);
+                                lineEnd = next.first;
                             }
 
-                            // Obtain the current texture pixel color if there is any texture, otherwise use the wall `tint`
-                            uint8_t tr, tg, tb, ta;
-                            if(isSolidColor) {
-                                //SDL_GetRGBA(cdi->wallDataPtr->tint, sdlSurf->format, &tr, &tg, &tb, &ta);
-                                deColor(cdi->wallDataPtr->tint, tr, tg, tb, ta);
-                            } else {
-                                float planeVertical = (drawEnd - h) / (drawEnd - (int)drawStart);
-                                //SDL_GetRGBA(tex->getCoords(planeHorizontal, planeVertical - 0.001f), sdlSurf->format, &tr, &tg, &tb, &ta);
-                                deColor(tex->getCoords(planeHorizontal, planeVertical - 0.001f), tr, tg, tb, ta);
+                            if(drawEnd >= lineStart && drawEnd <= lineEnd) {
+                                // End coordinate is included in a line part drawing range, clip the drawing end coordinate to it
+                                lineEnd = drawEnd;
+                                neIndex = -1;
+                            } else if(drawEnd <= lineStart) {
+                                // Line part drawing range is below the end coordinate, nothing will be visible from now on
+                                break;
                             }
+                        }                    
 
-                            // If pixel is transparent in any level, do not draw it
-                            if(ta != 255)
-                                continue;
+                        // Add new exclusion range marked by the drawn line
+                        bool append   = true;  // Should modified range be added to exclusions list?
+                        int varStart  = drawStart;
+                        int varEnd    = drawEnd;
+                        int e = 0;
+                        while(e < exclCount) {
+                            bool remove = false;  // Should the current exclusion range be removed from list?
+                            pair<int, int>& ex = drawExcls.at(e);
 
-                            // Apply lightning to the color
-                            if(bLightEnabled) {
-                                const float minBn = 0.2f;
-                                float perc = -1 * (normal.dot(vLightDir) - 1) / 2; // Brightness linear interploation percent
-                                float bn = minBn + (1 - minBn) * perc;             // Final brightness
-                                tr *= bn;
-                                tg *= bn;
-                                tb *= bn;
-                            }
-
-                            // Draw settings-compliant pixel
-                            SDL_Rect pixel = { column, h, iColumnsPerRay, iRowsInterval };
-                            SDL_SetRenderDrawColor(sdlRend, tr, tg, tb, ta);
-                            SDL_RenderFillRect(sdlRend, &pixel);
-                        }
-
-                        // Append new exclusion, do it so vector remains sorted according to exclusions' start coordinate
-                        if(dbStart != dbEnd) {
-                            int index = exclCount == 0 ? 0 : exclCount;
-                            for(int e = 0; e < exclCount; e++) {
-                                if(dbStart <= drawExcls.at(e).first) {
-                                    index = e;
+                            if(varStart >= ex.first && varStart <= ex.second) {
+                                if(varEnd > ex.second) {
+                                    // Leftwardly-included in the exclusion
+                                    varStart = ex.first;
+                                    remove   = true;
+                                } else {
+                                    // Totally included in the exclusion
+                                    append   = false;
                                     break;
                                 }
+                            } else if(varEnd >= ex.first && varEnd <= ex.second) {
+                                if(varStart < ex.first) {
+                                    // Rightwardly-included
+                                    varEnd = ex.second;
+                                    remove = true;
+                                } else {
+                                    // Totally included
+                                    append = false;
+                                    break;
+                                }
+                            } else if(varStart < ex.first && varEnd > ex.second) {
+                                // The exclusion range is totally included in the input range
+                                remove = true;
                             }
-                            drawExcls.insert(drawExcls.begin() + index, make_pair(dbStart, dbEnd));
-                            exclCount++;
+
+                            if(remove) {
+                                drawExcls.erase(drawExcls.begin() + e);
+                                exclCount--;
+                                e = 0;
+                            } else
+                                e++;
+                        }
+
+                        // If needed, add exclusion in such way that will leave the vector sorted ascendigly by start coordinates
+                        if(append) {
+                            bool added = false;
+                            for(int e = 0; e < exclCount; e++)
+                                if(varStart <= drawExcls.at(e).first) {
+                                    drawExcls.insert(drawExcls.begin() + e, make_pair(varStart, varEnd));
+                                    added = true;
+                                    break;
+                                }
+                            if(!added)
+                                drawExcls.push_back(make_pair(varStart, varEnd));
                         }
                     }
 
@@ -502,9 +535,16 @@ namespace rpge {
                 }
             }
 
-            #ifdef DEBUG
 
-// TODO: Create more sophisticated visual tools for debugging here
+            #ifdef DEBUG
+            
+            // Draw exclusion ranges
+            for(const pair<int, int>& excl : drawExcls) {
+                SDL_SetRenderDrawColor(sdlRend, 0, 255, 0, 255);
+                SDL_RenderDrawPoint(sdlRend, column, excl.first);
+                SDL_SetRenderDrawColor(sdlRend, 255, 0, 0, 255);
+                SDL_RenderDrawPoint(sdlRend, column, excl.second + 1);
+            }
 
             #endif
         }
