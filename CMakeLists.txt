@@ -19,7 +19,6 @@ set(
 	${CMAKE_SOURCE_DIR}/source/RPGE_camera.cpp
 	${CMAKE_SOURCE_DIR}/source/RPGE_engine.cpp
 	${CMAKE_SOURCE_DIR}/source/RPGE_math.cpp
-	${CMAKE_SOURCE_DIR}/source/RPGE_texture.cpp
 	${CMAKE_SOURCE_DIR}/source/RPGE_dda.cpp
 	${CMAKE_SOURCE_DIR}/source/RPGE_globals.cpp
 	${CMAKE_SOURCE_DIR}/source/RPGE_scene.cpp

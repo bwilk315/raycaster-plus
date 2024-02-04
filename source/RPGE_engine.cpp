@@ -61,6 +61,9 @@ namespace rpge {
                 this->sdlRend = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED);
                 if(sdlRend != nullptr) {
                     // Everything is OK
+                    SDL_SetRenderDrawColor(sdlRend, 0, 0, 0, 255);
+                    SDL_RenderClear(sdlRend);
+
                     SDL_SetWindowResizable(this->sdlWindow, SDL_FALSE);
                     return;
                 }
@@ -365,17 +368,14 @@ namespace rpge {
 
                     // Find out range describing how column should be drawn for the current wall
                     float lineHeight = rRenderArea.h * (pcmDist / cdi->perpDist);
-                    int drawStart  = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
-                    int drawEnd    = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
+                    int drawStart    = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
+                    int drawEnd      = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
 
                     // Obtain information on the wall looks
-                    const Texture* tex = mainScene->getTextureSource(cdi->wallDataPtr->texId);
-                    float texPixelHeight = drawEnd - drawStart;
-                    bool isSolidColor    = true;
-                    if(tex != nullptr) {
-                        texPixelHeight /= (float)tex->getHeight();
-                        isSolidColor    = false;
-                    }
+                    SDL_Texture* texPtr = mainScene->getTextureSource(cdi->wallDataPtr->texId);
+                    bool isSolidColor = false;
+                    if(texPtr == nullptr)
+                        isSolidColor  = true;
 
                     // Compute normalized horizontal position on the wall plane
                     float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
@@ -429,22 +429,28 @@ namespace rpge {
                             int dbLs = clamp(lineStart, rRenderArea.y, rRenderArea.y + rRenderArea.h);
                             int dbLe = clamp(lineEnd,   rRenderArea.y, rRenderArea.y + rRenderArea.h);
                             if(dbLs != dbLe) {
-                                
-                                // Find pixel start & end coordinate, then get its color
-                                uint8_t cr, cg, cb, ca;
-                                float planeVertical;
+
+                                SDL_Rect rendRect = { column, dbLs, iColumnsPerRay, dbLe - dbLs };
                                 if(isSolidColor) {
+                                    // Draw solid-color column
+                                    uint8_t cr, cg, cb, ca;
                                     deColor(cdi->wallDataPtr->tint, cr, cg, cb, ca);
+                                    SDL_SetRenderDrawColor(sdlRend, cr, cg, cb, ca);
+                                    SDL_RenderFillRect(sdlRend, &rendRect);
                                 } else {
-                                    planeVertical = (drawEnd - dbLs) / (drawEnd - (int)drawStart);
-                                    deColor(tex->getCoords(planeHorizontal, planeVertical - 0.001f), cr, cg, cb, ca);
+
+// TODO: Fix visual bugs when line range exceeds render area
+                                    // Draw part of a texture
+                                    int texWidth, texHeight;
+                                    float offset = (dbLs - drawStart) / (float)(drawEnd - drawStart);
+                                    float length = (dbLe - dbLs)      / (float)(drawEnd - drawStart);
+                                    
+                                    SDL_QueryTexture(texPtr, NULL, NULL, &texWidth, &texHeight);
+                                    SDL_Rect texRect  = { texWidth * planeHorizontal, texHeight * offset, 1, texHeight * length };
+
+                                    SDL_RenderCopy(sdlRend, texPtr, &texRect, &rendRect);
                                 }
 
-/* TODO: Make it draw a part of the texture instead of drawing lots of lines (CPU inefficient), remake the RPGE_texture.hpp module
-         to use SDL-provided texture utilities (abandon libpng).
-*/
-                                SDL_SetRenderDrawColor(sdlRend, cr, cg, cb, ca);
-                                SDL_RenderDrawLine(sdlRend, column, dbLs, column, dbLe);
                             }
 
                             if(neIndex == -1)

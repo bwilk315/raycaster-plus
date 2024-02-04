@@ -11,7 +11,6 @@
 #include "RPGE_globals.hpp"
 #include "RPGE_math.hpp"
 #include "RPGE_scene.hpp"
-#include "RPGE_texture.hpp"
 
 namespace rpge {
     using ::std::chrono::time_point;

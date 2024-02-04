@@ -6,10 +6,9 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <SDL2/SDL_pixels.h>
+#include <SDL2/SDL_image.h>
 #include "RPGE_globals.hpp"
 #include "RPGE_math.hpp"
-#include "RPGE_texture.hpp"
 
 namespace rpge {
     using ::std::map;
@@ -60,9 +59,10 @@ namespace rpge {
             int height;
             int* tiles;
             map<int, vector<WallData>> tileWalls; // Tile ID -> Array of walls information
-            map<int, Texture> texSources;         // Texture ID -> Texture source object
+            map<int, SDL_Texture*> texSources;    // Texture ID -> Pointer to texture structure
             map<string, int> texIds;              // File name -> Texture ID
             vector<int> tileIds;                  // All types of tile IDs
+            SDL_Renderer* sdlRend;
 
             // Returns index in the tiles array that corresponds to the specified position
             int posAsDataIndex(int x, int y) const;
@@ -77,9 +77,9 @@ namespace rpge {
                 E_RPS_UNKNOWN_STRING_FORMAT    // Caused by not following string notation where needed
             };
 
-            Scene();
-            Scene(int width, int height);
-            Scene(const string& rpsFile);
+            Scene(SDL_Renderer* sdlRend);
+            Scene(SDL_Renderer* sdlRend, int width, int height);
+            Scene(SDL_Renderer* sdlRend, const string& rpsFile);
             ~Scene();
 
             /* Returns if tile location ( `x`, `y` ) is included in the scene bounds */
@@ -106,18 +106,15 @@ namespace rpge {
             /* Returns height of the scene in tiles */
             int                getHeight() const;
 
-            /* Returns array index of a texture with file name `rpsFile` if it is loaded, otherwise
+            /* Returns array index of a texture with file name `file` if it is loaded, otherwise
             * returns 0. */
-            int                getTextureId(const string& rpsFile) const;
+            int                getTextureId(const string& file) const;
             
             /* Returns file name of a texture with array index of `texId` if it is loaded, otherwise
             * returns empty string. */
             string             getTextureName(int texId) const;
 
-            /* Returns pointer to a `Texture` class instance that got loaded at `texId` array index
-            * or using `rpsFile` file, otherwise returns null pointer. */
-            const Texture*     getTextureSource(int texId) const;
-            const Texture*     getTextureSource(const string& rpsFile) const;
+            SDL_Texture*       getTextureSource(int texId);
 
 	        /* Returns pointer to a vector holding all types of tile IDs */
             const vector<int>* getTileIds() const;
@@ -127,13 +124,13 @@ namespace rpge {
              * free to edit its elements by reference. */
             vector<WallData>*  getTileWalls(int tileId);
 
-	        /* Loads texture from file `pngFile` to an array. Returns array index at which the texture was
+	        /* Loads texture from file `file` to an array. Returns array index at which the texture was
 	         * loaded but incremented by one, if failed returns 0. */
-            int                loadTexture(const string& pngFile);
+            int                loadTexture(const string& file);
 
-	        /* Loads scene from RPS (Raycaster Plus Scene) file `file`, returns line at which interpretation
+	        /* Loads scene from RPS (Raycaster Plus Scene) file `rpsFile`, returns line at which interpretation
 	         * error occurred or the last line with error not set. */ 
-            int                loadFromFile(const string& file);
+            int                loadFromFile(const string& rpsFile);
     };
     #ifdef DEBUG
     ostream& operator<<(ostream& stream, const Scene& scene);

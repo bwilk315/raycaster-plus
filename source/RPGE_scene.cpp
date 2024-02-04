@@ -68,29 +68,35 @@ namespace rpge {
     int Scene::posAsDataIndex(int x, int y) const {
         return width * (height - y - 1) + x;
     }
-    Scene::Scene() {
+    Scene::Scene(SDL_Renderer* sdlRend) {
         this->error = E_CLEAR;
         this->width = 0;
         this->height = 0;
         this->tiles = nullptr;
         this->tileWalls = map<int, vector<WallData>>();
-        this->texSources = map<int, Texture>();
+        this->texSources = map<int, SDL_Texture*>();
         this->texIds = map<string, int>();
         this->tileIds = vector<int>();
+        this->sdlRend = sdlRend;
     }
-    Scene::Scene(int width, int height) : Scene() {
+    Scene::Scene(SDL_Renderer* sdlRend, int width, int height) : Scene(sdlRend) {
         this->width = width;
         this->height = height;
         this->tiles = new int[width * height];
     }
-    Scene::Scene(const string& file) : Scene() {
+    Scene::Scene(SDL_Renderer* sdlRend, const string& file) : Scene(sdlRend) {
         loadFromFile(file);
     }
     Scene::~Scene() {
         if(tiles != nullptr)
             delete[] tiles;
+
         tileWalls.clear();
+
+        for(pair<int, SDL_Texture*> sources : texSources)
+            SDL_DestroyTexture(sources.second);
         texSources.clear();
+        
         texIds.clear();
     }
     bool Scene::checkPosition(int x, int y) const {
@@ -127,10 +133,10 @@ namespace rpge {
     int Scene::getHeight() const {
         return height;
     }
-    int Scene::getTextureId(const string& rpsFile) const {
-        if(texIds.count(rpsFile) == 0)
+    int Scene::getTextureId(const string& file) const {
+        if(texIds.count(file) == 0)
             return 0;
-        return texIds.at(rpsFile);
+        return texIds.at(file);
     }
     string Scene::getTextureName(int texId) const {
         for(const auto& p : texIds)
@@ -138,15 +144,11 @@ namespace rpge {
                 return p.first;
         return "";
     }
-    const Texture* Scene::getTextureSource(int texId) const {
+    SDL_Texture* Scene::getTextureSource(int texId) {
         if(texSources.count(texId) == 0)
             return nullptr;
-        return &texSources.at(texId);
-    }
-    const Texture* Scene::getTextureSource(const string& rpsFile) const {
-        if(texIds.count(rpsFile) == 0)
-            return nullptr;
-        return &texSources.at(texIds.at(rpsFile));
+        
+        return texSources.at(texId);
     }
     const vector<int>* Scene::getTileIds() const {
         return &tileIds;
@@ -156,23 +158,22 @@ namespace rpge {
             return nullptr;
         return &tileWalls.at(tileId);
     }
-    int Scene::loadTexture(const string& pngFile) {
-        if(texIds.count(pngFile) != 0)
-            return texIds.at(pngFile);
-        // Add a new texture entry, if loading failed then erase it, returns the texture ID
+    int Scene::loadTexture(const string& file) {
+        if(texIds.count(file) != 0)
+            return texIds.at(file);
+
         int id = texIds.size() + 1;
-        texSources.insert(pair<int, Texture>(id, Texture()));
-        texSources.at(id).loadFromFile(pngFile);
-        if(texSources.at(id).getError()) {
-            texSources.erase(id);
+        SDL_Texture* tex = IMG_LoadTexture(sdlRend, file.c_str());
+        if(tex == nullptr)
             return 0;
-        }
-        texIds.insert(pair<string, int>(pngFile, id));
+
+        texSources.insert(pair<int, SDL_Texture*>(id, tex));
+        texIds.insert(pair<string, int>(file, id));
         return id;
     }
-    int Scene::loadFromFile(const string& file) {
+    int Scene::loadFromFile(const string& rpsFile) {
         error = E_CLEAR;
-        ifstream stream(file);
+        ifstream stream(rpsFile);
         int ln = 0;
         if(!stream.good()) {
             error = E_RPS_FAILED_TO_READ;
