@@ -430,7 +430,7 @@ namespace rpge {
                             int dbLe = clamp(lineEnd,   rRenderArea.y, rRenderArea.y + rRenderArea.h);
                             if(dbLs != dbLe) {
 
-                                SDL_Rect rendRect = { column, dbLs, iColumnsPerRay, dbLe - dbLs };
+                                SDL_Rect rendRect = { column, lineStart, iColumnsPerRay, lineEnd - lineStart };
                                 if(isSolidColor) {
                                     // Draw solid-color column
                                     uint8_t cr, cg, cb, ca;
@@ -438,14 +438,29 @@ namespace rpge {
                                     SDL_SetRenderDrawColor(sdlRend, cr, cg, cb, ca);
                                     SDL_RenderFillRect(sdlRend, &rendRect);
                                 } else {
-
-// TODO: Fix visual bugs when line range exceeds render area
                                     // Draw part of a texture
                                     int texWidth, texHeight;
-                                    float offset = (dbLs - drawStart) / (float)(drawEnd - drawStart);
-                                    float length = (dbLe - dbLs)      / (float)(drawEnd - drawStart);
-                                    
                                     SDL_QueryTexture(texPtr, NULL, NULL, &texWidth, &texHeight);
+
+                                    // Texture pixel height in screen pixels
+                                    float tpHeight = (drawEnd - drawStart) / (float)texHeight;
+
+                                    float offset   = (rendRect.y - drawStart);
+                                    float length   = rendRect.h;
+
+// THIS BLOCK REMOVES PARTIAL PIXELS = FIXES WRONG PIXELS STRETCH
+                                    if(lineStart == drawStart)
+                                        rendRect.h = floorf(rendRect.h / tpHeight) * tpHeight;
+                                    else if(lineEnd == drawEnd) {
+                                        float dist = rendRect.y - drawStart;
+                                        dist = ceilf(dist / tpHeight) * tpHeight;
+                                        rendRect.y = drawStart + dist;
+                                        rendRect.h = floorf(rendRect.h / tpHeight) * tpHeight;
+                                    }
+
+                                    offset /= (float)(drawEnd - drawStart);
+                                    length /= (float)(drawEnd - drawStart);
+                                    
                                     SDL_Rect texRect  = { texWidth * planeHorizontal, texHeight * offset, 1, texHeight * length };
 
                                     SDL_RenderCopy(sdlRend, texPtr, &texRect, &rendRect);
@@ -476,61 +491,33 @@ namespace rpge {
                             }
                         }                    
 
-                        // Add new exclusion range marked by the drawn line
-                        bool append   = true;  // Should modified range be added to exclusions list?
-                        int varStart  = drawStart;
-                        int varEnd    = drawEnd;
-                        int e = 0;
-                        while(e < exclCount) {
-                            bool remove = false;  // Should the current exclusion range be removed from list?
+                        // Prepare exclusions vector for the new exclusion (the drawn line range), every range in that vector
+                        // must stay separated from each other.
+                        int varStart = drawStart;
+                        int varEnd   = drawEnd;
+                        int e = -1;
+                        while(++e < exclCount) {
                             pair<int, int>& ex = drawExcls.at(e);
 
-                            if(varStart >= ex.first && varStart <= ex.second) {
-                                if(varEnd > ex.second) {
-                                    // Leftwardly-included in the exclusion
-                                    varStart = ex.first;
-                                    remove   = true;
-                                } else {
-                                    // Totally included in the exclusion
-                                    append   = false;
-                                    break;
-                                }
-                            } else if(varEnd >= ex.first && varEnd <= ex.second) {
-                                if(varStart < ex.first) {
-                                    // Rightwardly-included
-                                    varEnd = ex.second;
-                                    remove = true;
-                                } else {
-                                    // Totally included
-                                    append = false;
-                                    break;
-                                }
-                            } else if(varStart < ex.first && varEnd > ex.second) {
-                                // The exclusion range is totally included in the input range
-                                remove = true;
-                            }
-
-                            if(remove) {
+                            if(ex.first <= varEnd && ex.second >= varStart) {
+                                varStart = ex.first  < varStart ? ex.first  : varStart;
+                                varEnd   = ex.second > varEnd   ? ex.second : varEnd  ;
                                 drawExcls.erase(drawExcls.begin() + e);
                                 exclCount--;
-                                e = 0;
-                            } else
-                                e++;
+                                e = -1;
+                            }
                         }
+                        // Add the drawn line range as new exclusion, perform it in such way that will remain the vector sorted
+                        // ascendingly by start coordinate.
+                        int t = exclCount;
+                        for(int e = 0; e < exclCount; e++)
+                            if(varStart <= drawExcls.at(e).first) {
+                                t = e;
+                                break;
+                            }
+                        drawExcls.insert(drawExcls.begin() + t, make_pair(varStart, varEnd));
 
-                        // If needed, add exclusion in such way that will leave the vector sorted ascendigly by start coordinates
-                        if(append) {
-                            bool added = false;
-                            for(int e = 0; e < exclCount; e++)
-                                if(varStart <= drawExcls.at(e).first) {
-                                    drawExcls.insert(drawExcls.begin() + e, make_pair(varStart, varEnd));
-                                    added = true;
-                                    break;
-                                }
-                            if(!added)
-                                drawExcls.push_back(make_pair(varStart, varEnd));
-                        }
-                    }
+                    }  // drawable?
 
                     // Decide if ray should keep on walking, free column drawing information because it was already used
                     if(cdi->wallDataPtr->stopsRay)
