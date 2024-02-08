@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <map>
+#include <memory>
 #include <SDL2/SDL.h>
 #include "RPGE_camera.hpp"
 #include "RPGE_dda.hpp"
@@ -16,8 +17,9 @@ namespace rpge {
     using ::std::chrono::time_point;
     using ::std::chrono::system_clock;
     using ::std::chrono::duration;
-    using ::std::pair;
     using ::std::map;
+    using ::std::unique_ptr;
+    using ::std::pair;
     using ::std::make_pair;
     using ::std::sqrt;
     using ::std::tan;
@@ -28,18 +30,6 @@ namespace rpge {
         PRESS, // Key is pressed
         UP     // Key is not pressed anymore (single event)
     };
-
-    struct ColumnDrawInfo {
-        float           perpDist;    // Perpendicular distance from wall hit point to the camera plane
-        Vector2         localInter;  // Point of ray-wall lines intersection in local tile coordinates
-        const WallData* wallDataPtr; // Pointer to the hit wall structure
-
-        ColumnDrawInfo();
-        ColumnDrawInfo(float perpDist, const Vector2& localInter, const WallData* wallDataPtr);
-    };
-    #ifdef DEBUG
-    ostream& operator<<(ostream& stream, const ColumnDrawInfo& cdi);
-    #endif
 
     class Engine {
         private:

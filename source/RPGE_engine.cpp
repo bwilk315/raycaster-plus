@@ -3,28 +3,6 @@
 
 namespace rpge {    
 
-    /*************************************************/
-    /********** STRUCTURE: COLUMN DRAW INFO **********/
-    /*************************************************/
-
-    ColumnDrawInfo::ColumnDrawInfo() {
-        this->perpDist = -1;
-        this->localInter = Vector2::ZERO;
-        this->wallDataPtr = nullptr;
-    }
-    ColumnDrawInfo::ColumnDrawInfo(float perpDist, const Vector2& localInter, const WallData* wallDataPtr) {
-        this->perpDist = perpDist;
-        this->localInter = localInter;
-        this->wallDataPtr = wallDataPtr;
-    }
-    #ifdef DEBUG
-    ostream& operator<<(ostream& stream, const ColumnDrawInfo& cdi) {
-        stream << "ColumnDrawInfo(perpDist=" << cdi.perpDist << ", localInter=" << cdi.localInter;
-        stream << ", wallData=" << *cdi.wallDataPtr << ")";
-        return stream;
-    }
-    #endif
-
     /***********************************/
     /********** CLASS: ENGINE **********/
     /***********************************/
@@ -298,53 +276,35 @@ namespace rpge {
                 /********** PREPARATION OF INFORMATION REQUIRED TO DRAW COLUMN **********/
                 /************************************************************************/
 
-
-                // Collect draw information as pointers to dedicated structure
                 int wallCount = wallData->size();
-                // Tells how many first items of `drawInfoPtrs` array are not null pointers
-                int dipLen    = 0;
-                // Draw information is stored as pointers because they are more efficient to sort later
-                ColumnDrawInfo* drawInfoPtrs[wallCount];
+                // Array of distances to local intersection points of walls with respective indices (e.g. drawInfos[1]
+                // is all about wallData.at(1)).
+                pair<float, Vector2> drawInfos[wallCount];
+
                 for(int i = 0; i != wallCount; i++) {
-                    ColumnDrawInfo* cdi = new ColumnDrawInfo;
-                    cdi->wallDataPtr = &wallData->at(i);
+                    const WallData* wdPtr = &wallData->at(i);
+                    float perpDist = 0xffff;
+                    Vector2 localInter;
 
                     // The formula below was derived by parts, and compressed into one long computation
                     // NOTE: this formula works even when enter point is actually inside a tile.
-                    float a         = cdi->wallDataPtr->func.slope;
-                    float h         = cdi->wallDataPtr->func.height;
+                    float a         = wdPtr->func.slope;
+                    float h         = wdPtr->func.height;
                     float interDist = ( localEnter.y - a * localEnter.x - ( h == 0 ? SAFE_LINE_HEIGHT : h ) ) / ( rayDir.x * a - rayDir.y );
 
                     // Distance is negative when a wall is not reached by the ray, this and the fact that the longest
                     // distance in tile boundary is 1/sqrt(2), can be used to perform early classification.
                     if(interDist >= 0 && interDist <= SQRT2) {
-                        cdi->localInter = interDist * rayDir + localEnter;
+                        localInter = interDist * rayDir + localEnter;
 
                         // Check if point is included in arguments and values range defined
-                        if((cdi->localInter.x >= cdi->wallDataPtr->func.xMin && cdi->localInter.x <= cdi->wallDataPtr->func.xMax) &&
-                           (cdi->localInter.y >= cdi->wallDataPtr->func.yMin && cdi->localInter.y <= cdi->wallDataPtr->func.yMax)) {
-
-                            cdi->perpDist = rayDir.dot(camDir) * ( hit.distance + interDist );
-                            drawInfoPtrs[dipLen++] = cdi;
-                            continue;
+                        if((localInter.x >= wdPtr->func.xMin && localInter.x <= wdPtr->func.xMax) &&
+                           (localInter.y >= wdPtr->func.yMin && localInter.y <= wdPtr->func.yMax)) {
+                            perpDist = rayDir.dot(camDir) * ( hit.distance + interDist );
                         }
                     }
 
-                    // Ray missed the wall, therefore its information is garbage
-                    delete cdi;
-                }
-                if(dipLen == 0)
-                    continue;
-
-                // Perform bubble sort on the drawing information in ascending order, sort by distance from the camera plane
-                for(int i = 0; i != dipLen; i++) {
-                    for(int j = 1; j != dipLen; j++) {
-                        if(drawInfoPtrs[j - 1]->perpDist > drawInfoPtrs[j]->perpDist) {
-                            ColumnDrawInfo* temp = drawInfoPtrs[j];
-                            drawInfoPtrs[j]      = drawInfoPtrs[j - 1];
-                            drawInfoPtrs[j - 1]  = temp;
-                        }
-                    }
+                    drawInfos[i] = make_pair(perpDist, localInter);
                 }
 
 
@@ -352,13 +312,33 @@ namespace rpge {
                 /********** COLUMN DRAWING USING COLLECTED WALLS DRAWING INFORMATION **********/
                 /******************************************************************************/
 
-                for(int i = 0; i != dipLen; i++) {
-                    ColumnDrawInfo* cdi = drawInfoPtrs[i];
+                for(int i = 0; i != wallCount; i++) {
+
+                    int nearest = 0;
+                    float perpDist = 0xffff;
+
+                    // Find index of the nearest wall (and additionally save its distance)
+                    for(int j = 0; j != wallCount; j++) {
+                        float cpd = drawInfos[j].first;
+                        if(cpd != 0xffff && cpd < perpDist) {
+                            nearest = j;
+                            perpDist = drawInfos[j].first;
+                        }
+                    }
+
+                    if(perpDist == 0xffff)
+                        continue;
+
+                    // Exclude the (for now) the nearest wall and collect its second property
+                    drawInfos[nearest].first = 0xffff;
+                    Vector2 localInter = drawInfos[nearest].second;
+
+                    const WallData* wdPtr = &wallData->at(nearest);
 
                     // Calculate a normal vector of the wall, it always points outwards
                     bool flipped = false;
-                    float a      = cdi->wallDataPtr->func.slope;
-                    float h      = cdi->wallDataPtr->func.height;
+                    float a      = wdPtr->func.slope;
+                    float h      = wdPtr->func.height;
                     float coef   = 1 / sqrt( a * a + 1 );
                     Vector2 normal(a * coef, -1 * coef);
                     if(camPos.y >= a * (camPos.x - hit.tile.x) + hit.tile.y + h) {
@@ -367,18 +347,18 @@ namespace rpge {
                     }
 
                     // Find out range describing how column should be drawn for the current wall
-                    float lineHeight = rRenderArea.h * (pcmDist / cdi->perpDist);
-                    int drawStart    = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - cdi->wallDataPtr->hMax);
-                    int drawEnd      = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * cdi->wallDataPtr->hMin;
+                    float lineHeight = rRenderArea.h * (pcmDist / perpDist);
+                    int drawStart    = rRenderArea.y + (rRenderArea.h - lineHeight) / 2 + lineHeight * (1 - wdPtr->hMax);
+                    int drawEnd      = rRenderArea.y + (rRenderArea.h + lineHeight) / 2 - lineHeight * wdPtr->hMin;
 
                     // Obtain information on the wall looks
-                    SDL_Texture* texPtr = mainScene->getTextureSource(cdi->wallDataPtr->texId);
+                    SDL_Texture* texPtr = mainScene->getTextureSource(wdPtr->texId);
                     bool isSolidColor = false;
                     if(texPtr == nullptr)
                         isSolidColor  = true;
 
                     // Compute normalized horizontal position on the wall plane
-                    float planeHorizontal = (cdi->localInter - cdi->wallDataPtr->pivot).magnitude() / cdi->wallDataPtr->length;
+                    float planeHorizontal = (localInter - wdPtr->pivot).magnitude() / wdPtr->length;
                     if(flipped)
                         planeHorizontal = 1 - planeHorizontal;
 
@@ -420,7 +400,7 @@ namespace rpge {
                         if(isSolidColor) {
                             // Draw solid-color column
                             uint8_t cr, cg, cb, ca;
-                            deColor(cdi->wallDataPtr->tint, cr, cg, cb, ca);
+                            deColor(wdPtr->tint, cr, cg, cb, ca);
                             SDL_SetRenderDrawColor(sdlRend, cr, cg, cb, ca);
                             SDL_RenderFillRect(sdlRend, &rendRect);
                         } else {
@@ -442,7 +422,8 @@ namespace rpge {
                             length /= (float)(drawEnd - drawStart);
                             
                             SDL_Rect texRect  = { texWidth * planeHorizontal, texHeight * offset, 1, texHeight * length };
-
+                            
+// TODO: Solve the mystery of huge lags when encountering textures wall
                             SDL_RenderCopy(sdlRend, texPtr, &texRect, &rendRect);
                         } // DRAW
 
@@ -479,11 +460,10 @@ namespace rpge {
                     drawExcls.insert(drawExcls.begin() + t, make_pair(varStart, varEnd));
 
                     // Decide if ray should keep on walking, free column drawing information because it was already used
-                    if(cdi->wallDataPtr->stopsRay)
+                    if(wdPtr->stopsRay) {
                         keepWalking = false;
-                    delete cdi;
-                    if(!keepWalking)
                         break;
+                    }
                 }
             }
 
