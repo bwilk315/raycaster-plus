@@ -77,7 +77,7 @@ namespace rpge {
                see `E_<error_name>` constants for more details about individual errors. */ 
             int                    getError() const;
 
-            /* Returns time in milliseconds telling how long processing of the last frame has taken */
+            /* Returns time in seconds telling how long processing of the last frame has taken */
             float                  getElapsedTime() const;
 
             /* Returns total amount of processed frames (or `tick` method calls) */

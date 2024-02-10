@@ -1,0 +1,9 @@
+
+Things to do in the future:
+- write EXAMPLE.md
+- Implement support for Windows platform
+- Remake CMake configuration file to be professional and cross-platform
+
+Optional things that would enchance the engine:
+- Invent new way of drawing texture on a column, add one-sdl-call based opacity shading
+- Code tools for wider control over what is rendered for engine users

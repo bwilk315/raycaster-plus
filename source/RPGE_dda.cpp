@@ -30,7 +30,7 @@ namespace rpge {
 
     DDA::DDA() {
         this->initialized = false;
-        this->maxTileDist = 0;
+        this->maxTileDist = 128;
         this->scene = nullptr;
     }
     DDA::DDA(Scene* scene) : DDA() {

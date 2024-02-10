@@ -39,6 +39,7 @@ namespace rpge {
                 this->sdlRend = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED);
                 if(sdlRend != nullptr) {
                     // Everything is OK
+                    SDL_SetRenderDrawBlendMode(sdlRend, SDL_BLENDMODE_BLEND);
                     SDL_SetRenderDrawColor(sdlRend, 0, 0, 0, 255);
                     SDL_RenderClear(sdlRend);
 
@@ -223,9 +224,6 @@ namespace rpge {
         int column = bRedraw ? rRenderArea.x : (rRenderArea.x + rRenderArea.w);
 
         // Draw the current frame, which consists of pixel columns
-        #ifdef DEBUG
-        bool centerDebugDone = false;
-        #endif
         for( ; column < (rRenderArea.x + rRenderArea.w); column += iColumnsPerRay) {
 
             // Drawing exclusions for the current pixel column encoded in key-value pair (start-end heights in screen coordinates)
@@ -408,7 +406,7 @@ namespace rpge {
                             float offset   = (rendRect.y - drawStart);
                             float length   = rendRect.h;
 
-// THIS BLOCK REMOVES PARTIAL PIXELS = FIXES WRONG PIXELS STRETCH
+                            // THIS BLOCK REMOVES PARTIAL PIXELS = FIXES WRONG PIXELS STRETCH
                             if(lineStart == drawStart)
                                 rendRect.h = floorf(rendRect.h / tpHeight) * tpHeight;
                             else if(lineEnd == drawEnd) {
@@ -423,13 +421,14 @@ namespace rpge {
                             
                             SDL_Rect texRect  = { texWidth * planeHorizontal, texHeight * offset, 1, texHeight * length };
                             
-// TODO: Solve the mystery of huge lags when encountering textures wall
                             SDL_RenderCopy(sdlRend, texPtr, &texRect, &rendRect);
-                        } // DRAW
-
-                        if(e == exclCount || lineEnd == drawEnd || ex.second >= drawEnd) {
-                            break;
                         }
+                        // Shade the drawn column by drawing black color with appropriate opacity over it
+                        SDL_SetRenderDrawColor(sdlRend, 0, 0, 0, (normal.dot(vLightDir) + 1.0f) / 2.0f * 128);
+                        SDL_RenderDrawRect(sdlRend, &rendRect);
+
+                        if(e == exclCount || lineEnd == drawEnd || ex.second >= drawEnd)
+                            break;
                     } 
 
 
@@ -467,6 +466,8 @@ namespace rpge {
                 }
             }
 
+            #ifdef DEBUG
+
             // Draw exclusion ranges
             for(const pair<int, int>& excl : drawExcls) {
                 SDL_SetRenderDrawColor(sdlRend, 0, 255, 0, 255);
@@ -474,9 +475,6 @@ namespace rpge {
                 SDL_SetRenderDrawColor(sdlRend, 255, 0, 0, 255);
                 SDL_RenderDrawPoint(sdlRend, column, excl.second + 1);
             }
-
-            #ifdef DEBUG
-            
 
             #endif
         }
