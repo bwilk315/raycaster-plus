@@ -1,6 +1,7 @@
 
 Things to do in the future:
-- write EXAMPLE.md
+[x] write EXAMPLE.md
+- write RPS.md
 - Implement support for Windows platform
 - Remake CMake configuration file to be professional and cross-platform
 
