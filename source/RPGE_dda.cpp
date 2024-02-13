@@ -1,24 +1,28 @@
 
 #include <RPGE_dda.hpp>
 
-namespace rpge {
+namespace rpge
+{
 
     /*********************************************/
     /********** STRUCTURE: RAY HIT INFO **********/
     /*********************************************/
 
-    RayHitInfo::RayHitInfo() {
+    RayHitInfo::RayHitInfo()
+    {
         this->distance = -1;
         this->tile = Vector2::ZERO;
         this->point = Vector2::ZERO;
     }
-    RayHitInfo::RayHitInfo(float distance, Vector2 tile, Vector2 point) {
+    RayHitInfo::RayHitInfo(float distance, Vector2 tile, Vector2 point)
+    {
         this->distance = distance;
         this->tile = tile;
         this->point = point;
     }
     #ifdef DEBUG
-    ostream& operator<<(ostream& stream, const RayHitInfo& hit) {
+    ostream& operator<<(ostream& stream, const RayHitInfo& hit)
+    {
         stream << "RayHitInfo(distance=" << hit.distance << ", tile=" << hit.tile << ", point=" << hit.point << ")";
         return stream;
     }
@@ -28,31 +32,40 @@ namespace rpge {
     /********** CLASS: DIGITAL DIFFERENTIAL ANALYSIS **********/
     /**********************************************************/
 
-    DDA::DDA() {
+    DDA::DDA()
+    {
         this->initialized = false;
         this->maxTileDist = 128;
         this->scene = nullptr;
     }
-    DDA::DDA(Scene* scene) : DDA() {
+    DDA::DDA(Scene* scene) : DDA()
+    {
         setTargetScene(scene);
     }
-    DDA::DDA(Scene* scene, int maxTileDist) : DDA(scene) {
+    DDA::DDA(Scene* scene, int maxTileDist) : DDA(scene)
+    {
         setMaxTileDistance(maxTileDist);
     }
-    void DDA::setTargetScene(Scene* scene) {
+    void DDA::setTargetScene(Scene* scene)
+    {
         this->scene = scene;
     }
-    void DDA::setMaxTileDistance(float distance) {
+    void DDA::setMaxTileDistance(float distance)
+    {
         maxTileDist = distance;
     }
-    float DDA::getMaxTileDistance() const {
+    float DDA::getMaxTileDistance() const
+    {
         return maxTileDist;
     }
-    Scene* DDA::getTargetScene() {
+    Scene* DDA::getTargetScene()
+    {
         return scene;
     }
-    void DDA::init(const Vector2& start, const Vector2& direction) {
-        if(scene == nullptr) {
+    void DDA::init(const Vector2& start, const Vector2& direction)
+    {
+        if(scene == nullptr)
+        {
             rayFlag = RF_FAIL;
             return;
         }
@@ -67,26 +80,36 @@ namespace rpge {
         deltaDistX = direction.x == 0 ? MAX_DD : std::abs(1 / direction.x);
         deltaDistY = direction.y == 0 ? MAX_DD : std::abs(1 / direction.y);
         // Set initial distances and stepping direction
-        if(direction.x < 0) {
+        if(direction.x < 0)
+        {
             stepX = -1;
             sideDistX = (start.x - planePosX) * deltaDistX;
-        } else {
+        }
+        else
+        {
             stepX = 1;
             sideDistX = (1 + planePosX - start.x) * deltaDistX;
         }
-        if(direction.y < 0) {
+        if(direction.y < 0)
+        {
             stepY = -1;
             sideDistY = (start.y - planePosY) * deltaDistY;
-        } else {
+        }
+        else
+        {
             stepY = 1;
             sideDistY = (1 + planePosY - start.y) * deltaDistY;
         }
     }
-    RayHitInfo DDA::next() {
-        if(!initialized) {
+    RayHitInfo DDA::next()
+    {
+        if(!initialized)
+        {
             rayFlag = RF_FAIL;
             return RayHitInfo();
-        } else if(!originDone) {
+        }
+        else if(!originDone)
+        {
             // Include the starting tile in the ray walk
             if(scene->getTileId(start.x, start.y) != 0)
                 rayFlag = RF_HIT;
@@ -95,11 +118,14 @@ namespace rpge {
         }
         
         // Step along appropriate axis
-        if(sideDistX < sideDistY) {
+        if(sideDistX < sideDistY)
+        {
             sideDistX += deltaDistX;
             planePosX += stepX;
             rayFlag = RF_SIDE;
-        } else {
+        }
+        else
+        {
             sideDistY += deltaDistY;
             planePosY += stepY;
             rayFlag = RF_CLEAR;
@@ -107,19 +133,22 @@ namespace rpge {
         // Check if hit tile is not exceeding the maximum tile distance
         int deltaPosX = planePosX - start.x;
         int deltaPosY = planePosY - start.y;
-        if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > maxTileDist * maxTileDist) {
+        if(deltaPosX * deltaPosX + deltaPosY * deltaPosY > maxTileDist * maxTileDist)
+        {
             rayFlag = RF_TOO_FAR;
             return RayHitInfo();
         }
         // Check if hit tile is not outside the plane
-        if(!scene->checkPosition(planePosX, planePosY)) {
+        if(!scene->checkPosition(planePosX, planePosY))
+        {
             rayFlag = RF_OUTSIDE;
             return RayHitInfo();
         }
 
         // If tile data is not zero, then ray hit this tile
         int tileData = scene->getTileId(planePosX, planePosY);
-        if(tileData != 0) {
+        if(tileData != 0)
+        {
             float distance = (rayFlag == RF_SIDE) ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
             rayFlag |= RF_HIT;
             return RayHitInfo(
@@ -133,7 +162,8 @@ namespace rpge {
         return RayHitInfo();
     }
     #ifdef DEBUG
-    ostream& operator<<(ostream& stream, DDA& dda) {
+    ostream& operator<<(ostream& stream, DDA& dda)
+    {
         stream << "DDA(rayFlag=" << dda.rayFlag << ", maxTileDist=" << dda.getMaxTileDistance();
         stream << ", scene=" << *dda.getTargetScene() << ")";
         return stream;

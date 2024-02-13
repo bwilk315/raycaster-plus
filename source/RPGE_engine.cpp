@@ -1,7 +1,8 @@
 
 #include <RPGE_engine.hpp>
 
-namespace rpge {    
+namespace rpge
+{    
 
     /***********************************/
     /********** CLASS: ENGINE **********/
@@ -9,7 +10,8 @@ namespace rpge {
 
     const float Engine::SAFE_LINE_HEIGHT = 0.0001f;
 
-    Engine::Engine(int screenWidth, int screenHeight) {
+    Engine::Engine(int screenWidth, int screenHeight)
+    {
         this->bClear             = false;
         this->bIsCursorLocked    = false;
         this->bLightEnabled      = false;
@@ -31,13 +33,16 @@ namespace rpge {
         this->rRenderArea        = rClearArea;
         this->keyStates          = map<int, KeyState>();
 
-        if(SDL_InitSubSystem(SDL_INIT_VIDEO) == 0) {
+        if(SDL_InitSubSystem(SDL_INIT_VIDEO) == 0)
+        {
             this->mainCamera = nullptr;
             this->walker     = new DDA();
             this->sdlWindow  = SDL_CreateWindow("Raycaster Plus Engine", 0, 0, screenWidth, screenHeight, SDL_WINDOW_SHOWN);
-            if(sdlWindow != nullptr) {
+            if(sdlWindow != nullptr)
+            {
                 this->sdlRend = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_ACCELERATED);
-                if(sdlRend != nullptr) {
+                if(sdlRend != nullptr)
+                {
                     // Everything is OK
                     SDL_SetRenderDrawBlendMode(sdlRend, SDL_BLENDMODE_BLEND);
                     SDL_SetRenderDrawColor(sdlRend, 0, 0, 0, 255);
@@ -50,7 +55,8 @@ namespace rpge {
         }
         iError |= E_SDL;
     }
-    Engine::~Engine() {
+    Engine::~Engine()
+    {
         if(walker != nullptr)
             delete walker;
         if(sdlWindow != nullptr)
@@ -60,93 +66,119 @@ namespace rpge {
             SDL_Quit();
         }
     }
-    void Engine::clear() {
+    void Engine::clear()
+    {
         bClear = true;
     }
-    void Engine::stop() {
+    void Engine::stop()
+    {
         bRun = false;
     }
-    void Engine::setClearColor(uint8_t r, uint8_t g, uint8_t b) {
+    void Engine::setClearColor(uint8_t r, uint8_t g, uint8_t b)
+    {
         cClearColor.r = r;
         cClearColor.g = g;
         cClearColor.b = b;
     }
-    void Engine::setCursorLock(bool locked) {
+    void Engine::setCursorLock(bool locked)
+    {
         bIsCursorLocked = locked;
     }
-    void Engine::setCursorVisibility(bool visible) {
+    void Engine::setCursorVisibility(bool visible)
+    {
         if(SDL_ShowCursor(visible) < 0)
             iError |= E_SDL;
     }
-    void Engine::setColumnsPerRay(int n) {
+    void Engine::setColumnsPerRay(int n)
+    {
         iColumnsPerRay = clamp(n, 1, rRenderArea.w);
     }
-    void Engine::setFrameRate(int fps) {
+    void Engine::setFrameRate(int fps)
+    {
         iFramesPerSecond = fps < 1 ? 1 : fps;
     }
-    void Engine::setLightBehavior(bool enabled, float angle) {
+    void Engine::setLightBehavior(bool enabled, float angle)
+    {
         bLightEnabled = enabled;
         vLightDir = (Vector2::RIGHT).rotate(angle);
     }
-    void Engine::setMainCamera(const Camera* camera) {
+    void Engine::setMainCamera(const Camera* camera)
+    {
         mainCamera = camera;
     }
-    void Engine::setClearArea(const SDL_Rect& rect) {
+    void Engine::setClearArea(const SDL_Rect& rect)
+    {
         rClearArea.w = clamp(rect.w, 0, rRenderArea.w);
         rClearArea.h = clamp(rect.h, 0, rRenderArea.h);
         rClearArea.x = clamp(rect.x, rRenderArea.x, rRenderArea.x + rRenderArea.w - rClearArea.w);
         rClearArea.y = clamp(rect.y, rRenderArea.y, rRenderArea.y + rRenderArea.h - rClearArea.h);
     }
-    void Engine::setRenderArea(const SDL_Rect& rect) {
+    void Engine::setRenderArea(const SDL_Rect& rect)
+    {
         rRenderArea.w = clamp(rect.w, 0, iScreenWidth);
         rRenderArea.h = clamp(rect.h, 0, iScreenHeight);
         rRenderArea.x = clamp(rect.x, 0, iScreenWidth - rRenderArea.w);
         rRenderArea.y = clamp(rect.y, 0, iScreenHeight - rRenderArea.h);
         setClearArea(rRenderArea);
     }
-    void Engine::setRowsInterval(int n) {
+    void Engine::setRowsInterval(int n)
+    {
         iRowsInterval = clamp(n, 1, rRenderArea.h);
     }
-    void Engine::render() {
+    void Engine::render()
+    {
         bRedraw = true;
     }
-    int Engine::getError() const {
+    int Engine::getError() const
+    {
         return iError;
     }
-    int Engine::getFrameCount() const {
+    int Engine::getFrameCount() const
+    {
         return frameIndex;
     }
-    int Engine::getScreenWidth() const {
+    int Engine::getScreenWidth() const
+    {
         return iScreenWidth;
     }
-    int Engine::getScreenHeight() const {
+    int Engine::getScreenHeight() const
+    {
         return iScreenHeight;
     }
-    float Engine::getElapsedTime() const {
+    float Engine::getElapsedTime() const
+    {
         return elapsedTime.count();
     }
-    SDL_Rect Engine::getRenderArea() const {
+    SDL_Rect Engine::getRenderArea() const
+    {
         return rRenderArea;
     }
-    SDL_Renderer* Engine::getRendererHandle() {
+    SDL_Renderer* Engine::getRendererHandle()
+    {
         return sdlRend;
     }
-    KeyState Engine::getKeyState(int sc) const {
+    KeyState Engine::getKeyState(int sc) const
+    {
         return keyStates.count(sc) == 0 ? KeyState::NONE : keyStates.at(sc);
     }
-    Vector2 Engine::getMousePosition() const {
+    Vector2 Engine::getMousePosition() const
+    {
         int x, y;
         SDL_GetMouseState(&x, &y);
         return Vector2(x, y);
     }
-    DDA* Engine::getWalker() {
+    DDA* Engine::getWalker()
+    {
         return walker;
     }
-    SDL_Window* Engine::getWindowHandle() {
+    SDL_Window* Engine::getWindowHandle()
+    {
         return sdlWindow;
     }
-    bool Engine::tick() {
-        if(iError) {
+    bool Engine::tick()
+    {
+        if(iError)
+        {
             stop();
             return bRun;
         }
@@ -166,7 +198,8 @@ namespace rpge {
 
         // Complete the key states
         auto ksCopy = keyStates; // To avoid iteration through dynamicly-sized map
-        for(auto& p : ksCopy) {
+        for(auto& p : ksCopy)
+        {
             if(p.second == KeyState::DOWN)
                 keyStates.at(p.first) = KeyState::PRESS;
             else if(p.second == KeyState::UP)
@@ -175,9 +208,11 @@ namespace rpge {
 
         // Interpret SDL events
         SDL_Event event;
-        while(SDL_PollEvent(&event)) {
+        while(SDL_PollEvent(&event))
+        {
             int sc;
-            switch(event.type) {
+            switch(event.type)
+            {
                 case SDL_QUIT:
                     bRun = false;
                     break;
@@ -215,7 +250,8 @@ namespace rpge {
         LinearFunc planeLine(planeSlope, camPos.y - planeSlope * camPos.x, 0, 1);
 
         // Clear the specified part of screen buffer if requested
-        if(bClear) {
+        if(bClear)
+        {
             SDL_SetRenderDrawColor(sdlRend, cClearColor.r, cClearColor.g, cClearColor.b, cClearColor.a);
             SDL_RenderFillRect(sdlRend, &rClearArea);
             bClear = false;
@@ -224,7 +260,8 @@ namespace rpge {
         int column = bRedraw ? rRenderArea.x : (rRenderArea.x + rRenderArea.w);
 
         // Draw the current frame, which consists of pixel columns
-        for( ; column < (rRenderArea.x + rRenderArea.w); column += iColumnsPerRay) {
+        for( ; column < (rRenderArea.x + rRenderArea.w); column += iColumnsPerRay)
+        {
 
             // Drawing exclusions for the current pixel column encoded in key-value pair (start-end heights in screen coordinates)
             vector<pair<int, int>> drawExcls;
@@ -235,7 +272,8 @@ namespace rpge {
             Vector2 rayDir = (camDir + planeVec * cameraX).normalized();
 
             walker->init(camPos, rayDir);
-            while(keepWalking) {
+            while(keepWalking)
+            {
 
 
                 /****************************************************/
@@ -255,10 +293,13 @@ namespace rpge {
                 Vector2 localEnter;
                 float localX = hit.point.x - (int)hit.point.x;
                 float localY = hit.point.y - (int)hit.point.y;
-                if(walker->rayFlag & DDA::RF_SIDE) {
+                if(walker->rayFlag & DDA::RF_SIDE)
+                {
                     localEnter.x = !hit.distance ? localX : (rayDir.x < 0);
                     localEnter.y = localY;
-                } else {
+                }
+                else
+                {
                     localEnter.x = localX;
                     localEnter.y = !hit.distance ? localY : (rayDir.y < 0);
                 }
@@ -279,7 +320,8 @@ namespace rpge {
                 // is all about wallData.at(1)).
                 pair<float, Vector2> drawInfos[wallCount];
 
-                for(int i = 0; i != wallCount; i++) {
+                for(int i = 0; i != wallCount; i++)
+                {
                     const WallData* wdPtr = &wallData->at(i);
                     float perpDist = 0xffff;
                     Vector2 localInter;
@@ -292,12 +334,14 @@ namespace rpge {
 
                     // Distance is negative when a wall is not reached by the ray, this and the fact that the longest
                     // distance in tile boundary is 1/sqrt(2), can be used to perform early classification.
-                    if(interDist >= 0 && interDist <= SQRT2) {
+                    if(interDist >= 0 && interDist <= SQRT2)
+                    {
                         localInter = interDist * rayDir + localEnter;
 
                         // Check if point is included in arguments and values range defined
                         if((localInter.x >= wdPtr->func.xMin && localInter.x <= wdPtr->func.xMax) &&
-                           (localInter.y >= wdPtr->func.yMin && localInter.y <= wdPtr->func.yMax)) {
+                           (localInter.y >= wdPtr->func.yMin && localInter.y <= wdPtr->func.yMax))
+                        {
                             perpDist = rayDir.dot(camDir) * ( hit.distance + interDist );
                         }
                     }
@@ -310,15 +354,18 @@ namespace rpge {
                 /********** COLUMN DRAWING USING COLLECTED WALLS DRAWING INFORMATION **********/
                 /******************************************************************************/
 
-                for(int i = 0; i != wallCount; i++) {
+                for(int i = 0; i != wallCount; i++)
+                {
 
                     int nearest = 0;
                     float perpDist = 0xffff;
 
                     // Find index of the nearest wall (and additionally save its distance)
-                    for(int j = 0; j != wallCount; j++) {
+                    for(int j = 0; j != wallCount; j++)
+                    {
                         float cpd = drawInfos[j].first;
-                        if(cpd != 0xffff && cpd < perpDist) {
+                        if(cpd != 0xffff && cpd < perpDist)
+                        {
                             nearest = j;
                             perpDist = drawInfos[j].first;
                         }
@@ -339,7 +386,8 @@ namespace rpge {
                     float h      = wdPtr->func.height;
                     float coef   = 1 / sqrt( a * a + 1 );
                     Vector2 normal(a * coef, -1 * coef);
-                    if(camPos.y >= a * (camPos.x - hit.tile.x) + hit.tile.y + h) {
+                    if(camPos.y >= a * (camPos.x - hit.tile.x) + hit.tile.y + h)
+                    {
                         normal *= -1;
                         flipped = true;
                     }
@@ -352,8 +400,7 @@ namespace rpge {
                     // Obtain information on the wall looks
                     SDL_Texture* texPtr = mainScene->getTextureSource(wdPtr->texId);
                     bool isSolidColor = false;
-                    if(texPtr == nullptr)
-                        isSolidColor  = true;
+                    if(texPtr == nullptr) isSolidColor  = true;
 
                     // Compute normalized horizontal position on the wall plane
                     float planeHorizontal = (localInter - wdPtr->pivot).magnitude() / wdPtr->length;
@@ -374,11 +421,15 @@ namespace rpge {
                     float tpHeight = (drawEnd - drawStart) / (float)texHeight;
 
                     pair<int, int> ex;
-                    while(true) {
-                        if(e != exclCount) {
+                    while(true)
+                    {
+                        if(e != exclCount)
+                        {
                             ex = drawExcls.at(e);
-                            if(ex.second > drawStart) {
-                                if(beg || drawStart > ex.first) {
+                            if(ex.second > drawStart)
+                            {
+                                if(beg || drawStart > ex.first)
+                                {
                                     lineStart = ex.second;
                                     if(++e != exclCount)
                                         ex = drawExcls.at(e);
@@ -387,7 +438,9 @@ namespace rpge {
                                 beg = true;
                                 if(lineStart > lineEnd)
                                     break;
-                            } else {
+                            }
+                            else
+                            {
                                 e++;
                                 continue;
                             }
@@ -395,13 +448,16 @@ namespace rpge {
 
                         // Draw drawable part of the line drawing range if possible
                         SDL_Rect rendRect = { column, lineStart, iColumnsPerRay, lineEnd - lineStart };
-                        if(isSolidColor) {
+                        if(isSolidColor)
+                        {
                             // Draw solid-color column
                             uint8_t cr, cg, cb, ca;
                             deColor(wdPtr->tint, cr, cg, cb, ca);
                             SDL_SetRenderDrawColor(sdlRend, cr, cg, cb, ca);
                             SDL_RenderFillRect(sdlRend, &rendRect);
-                        } else {
+                        }
+                        else
+                        {
                             // Draw part of a texture
                             float offset   = (rendRect.y - drawStart);
                             float length   = rendRect.h;
@@ -409,7 +465,8 @@ namespace rpge {
                             // THIS BLOCK REMOVES PARTIAL PIXELS = FIXES WRONG PIXELS STRETCH
                             if(lineStart == drawStart)
                                 rendRect.h = floorf(rendRect.h / tpHeight) * tpHeight;
-                            else if(lineEnd == drawEnd) {
+                            else if(lineEnd == drawEnd)
+                            {
                                 float dist = rendRect.y - drawStart;
                                 dist = ceilf(dist / tpHeight) * tpHeight;
                                 rendRect.y = drawStart + dist;
@@ -437,10 +494,12 @@ namespace rpge {
                     int varStart = drawStart;
                     int varEnd   = drawEnd;
                     e = -1;
-                    while(++e < exclCount) {
+                    while(++e < exclCount)
+                    {
                         pair<int, int>& ex = drawExcls.at(e);
 
-                        if(ex.first <= varEnd && ex.second >= varStart) {
+                        if(ex.first <= varEnd && ex.second >= varStart)
+                        {
                             varStart = ex.first  < varStart ? ex.first  : varStart;
                             varEnd   = ex.second > varEnd   ? ex.second : varEnd  ;
                             drawExcls.erase(drawExcls.begin() + e);
@@ -452,14 +511,16 @@ namespace rpge {
                     // ascendingly by start coordinate.
                     int t = exclCount;
                     for(int e = 0; e < exclCount; e++)
-                        if(varStart <= drawExcls.at(e).first) {
+                        if(varStart <= drawExcls.at(e).first)
+                        {
                             t = e;
                             break;
                         }
                     drawExcls.insert(drawExcls.begin() + t, make_pair(varStart, varEnd));
 
                     // Decide if ray should keep on walking, free column drawing information because it was already used
-                    if(wdPtr->stopsRay) {
+                    if(wdPtr->stopsRay)
+                    {
                         keepWalking = false;
                         break;
                     }
@@ -469,7 +530,8 @@ namespace rpge {
             #ifdef DEBUG
 
             // Draw exclusion ranges
-            for(const pair<int, int>& excl : drawExcls) {
+            for(const pair<int, int>& excl : drawExcls)
+            {
                 SDL_SetRenderDrawColor(sdlRend, 0, 255, 0, 255);
                 SDL_RenderDrawPoint(sdlRend, column, excl.first);
                 SDL_SetRenderDrawColor(sdlRend, 255, 0, 0, 255);
@@ -495,7 +557,8 @@ namespace rpge {
         
         SDL_Delay(delay); // Maybe this causes the lag when unfreezing?
 
-        if(bRedraw) {
+        if(bRedraw)
+        {
             SDL_RenderPresent(sdlRend);
             bRedraw = false;
         }

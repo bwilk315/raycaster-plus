@@ -1,13 +1,15 @@
 
 #include <RPGE_scene.hpp>
 
-namespace rpge {
+namespace rpge
+{
 
     /******************************************/
     /********** STRUCTURE: WALL DATA **********/
     /******************************************/
 
-    WallData::WallData() {
+    WallData::WallData()
+    {
         this->func = LinearFunc();
         this->pivot = Vector2::ZERO;
         this->length = 0;
@@ -17,7 +19,8 @@ namespace rpge {
         this->texId = 0;
         this->stopsRay = true;
     }
-    WallData::WallData(const LinearFunc& func, const uint32_t& tint, float hMin, float hMax, uint16_t texId, bool stopsRay) {
+    WallData::WallData(const LinearFunc& func, const uint32_t& tint, float hMin, float hMax, uint16_t texId, bool stopsRay)
+    {
         this->func = func;
         this->tint = tint;
         this->hMin = hMin; 
@@ -26,34 +29,46 @@ namespace rpge {
         this->stopsRay = stopsRay;
         updateMetrics();
     }
-    void WallData::updateMetrics() {
+    void WallData::updateMetrics()
+    {
         pivot.y = func.slope * func.xMin + func.height;
-        if(pivot.y < func.yMin) {
+        if(pivot.y < func.yMin)
+        {
             pivot.x = (func.yMin - func.height) / func.slope;
             pivot.y = func.yMin;
-        } else if(pivot.y > func.yMax) {
+        }
+        else if(pivot.y > func.yMax)
+        {
             pivot.x = (func.yMax - func.height) / func.slope;
             pivot.y = func.yMax;
-        } else {
+        }
+        else
+        {
             pivot.x = func.xMin;
         }
 
         Vector2 end;
         end.y = func.slope * func.xMax + func.height;
-        if(end.y < func.yMin) {
+        if(end.y < func.yMin)
+        {
             end.x = (func.yMin - func.height) / func.slope;
             end.y = func.yMin;
-        } else if(end.y > func.yMax) {
+        }
+        else if(end.y > func.yMax)
+        {
             end.x = (func.yMax - func.height) / func.slope;
             end.y = func.yMax;
-        } else {
+        }
+        else
+        {
             end.x = func.xMax;
         }
 
         length = (end - pivot).magnitude();
     }
     #ifdef DEBUG
-    ostream& operator<<(ostream& stream, const WallData& wd) {
+    ostream& operator<<(ostream& stream, const WallData& wd)
+    {
         stream << "WallData(func=" << wd.func << ", pivot=" << wd.pivot << ", length=" << wd.length;
         stream << ", hMin=" << wd.hMin << ", hMax=" << wd.hMax << ", texId=" << wd.texId << ", stopsRay=";
         stream << wd.stopsRay << ")";
@@ -65,10 +80,12 @@ namespace rpge {
     /********** CLASS: SCENE **********/
     /**********************************/
 
-    int Scene::posAsDataIndex(int x, int y) const {
+    int Scene::posAsDataIndex(int x, int y) const
+    {
         return width * (height - y - 1) + x;
     }
-    Scene::Scene(SDL_Renderer* sdlRend) {
+    Scene::Scene(SDL_Renderer* sdlRend)
+    {
         this->error = E_CLEAR;
         this->width = 0;
         this->height = 0;
@@ -79,15 +96,18 @@ namespace rpge {
         this->tileIds = vector<int>();
         this->sdlRend = sdlRend;
     }
-    Scene::Scene(SDL_Renderer* sdlRend, int width, int height) : Scene(sdlRend) {
+    Scene::Scene(SDL_Renderer* sdlRend, int width, int height) : Scene(sdlRend)
+    {
         this->width = width;
         this->height = height;
         this->tiles = new int[width * height];
     }
-    Scene::Scene(SDL_Renderer* sdlRend, const string& file) : Scene(sdlRend) {
+    Scene::Scene(SDL_Renderer* sdlRend, const string& file) : Scene(sdlRend)
+    {
         loadFromFile(file);
     }
-    Scene::~Scene() {
+    Scene::~Scene()
+    {
         if(tiles != nullptr)
             delete[] tiles;
 
@@ -99,12 +119,15 @@ namespace rpge {
         
         texIds.clear();
     }
-    bool Scene::checkPosition(int x, int y) const {
+    bool Scene::checkPosition(int x, int y) const
+    {
         return (x > -1 && x < width) && (y > -1 && y < height);
     }
-    int Scene::createTileWall(int tileId, const WallData& wd) {
+    int Scene::createTileWall(int tileId, const WallData& wd)
+    {
         // Create tile entry if there is no one yet
-        if(tileWalls.count(tileId) == 0) {
+        if(tileWalls.count(tileId) == 0)
+        {
             tileWalls.insert(make_pair( tileId, vector<WallData>() ));
             tileIds.push_back(tileId);
         }
@@ -112,8 +135,10 @@ namespace rpge {
         tileWalls.at(tileId).push_back(wd);
         return tileWalls.at(tileId).size() - 1;
     }
-    bool Scene::setTileId(int x, int y, int tileId) {
-        if(checkPosition(x, y)) {
+    bool Scene::setTileId(int x, int y, int tileId)
+    {
+        if(checkPosition(x, y))
+        {
             tiles[posAsDataIndex(x, y)] = tileId;
             return true;
         }
@@ -122,43 +147,52 @@ namespace rpge {
     int Scene::getError() const {
         return error;
     }
-    int Scene::getTileId(int x, int y) const {
+    int Scene::getTileId(int x, int y) const
+    {
         if(checkPosition(x, y))
             return tiles[posAsDataIndex(x, y)];
         return 0;
     }
-    int Scene::getWidth() const {
+    int Scene::getWidth() const
+    {
         return width;
     }
-    int Scene::getHeight() const {
+    int Scene::getHeight() const
+    {
         return height;
     }
-    int Scene::getTextureId(const string& file) const {
+    int Scene::getTextureId(const string& file) const
+    {
         if(texIds.count(file) == 0)
             return 0;
         return texIds.at(file);
     }
-    string Scene::getTextureName(int texId) const {
+    string Scene::getTextureName(int texId) const
+    {
         for(const auto& p : texIds)
             if(p.second == texId)
                 return p.first;
         return "";
     }
-    SDL_Texture* Scene::getTextureSource(int texId) {
+    SDL_Texture* Scene::getTextureSource(int texId)
+    {
         if(texSources.count(texId) == 0)
             return nullptr;
         
         return texSources.at(texId);
     }
-    const vector<int>* Scene::getTileIds() const {
+    const vector<int>* Scene::getTileIds() const
+    {
         return &tileIds;
     }
-    vector<WallData>* Scene::getTileWalls(int tileId) {
+    vector<WallData>* Scene::getTileWalls(int tileId)
+    {
         if(tileWalls.count(tileId) == 0)
             return nullptr;
         return &tileWalls.at(tileId);
     }
-    int Scene::loadTexture(const string& file) {
+    int Scene::loadTexture(const string& file)
+    {
         if(texIds.count(file) != 0)
             return texIds.at(file);
 
@@ -171,11 +205,13 @@ namespace rpge {
         texIds.insert(pair<string, int>(file, id));
         return id;
     }
-    int Scene::loadFromFile(const string& rpsFile) {
+    int Scene::loadFromFile(const string& rpsFile)
+    {
         error = E_CLEAR;
         ifstream stream(rpsFile);
         int ln = 0;
-        if(!stream.good()) {
+        if(!stream.good())
+        {
             error = E_RPS_FAILED_TO_READ;
             return ln;
         }
@@ -187,13 +223,16 @@ namespace rpge {
 
         string fileLine;
         int wdh = -1; // World data height (starting from top)
-        while(std::getline(stream, fileLine)) {
+        while(std::getline(stream, fileLine))
+        {
             ln++;
             // Extract space-separated arguments
             vector<string> args;
             string current = "";
-            for(const char& ch : fileLine) {
-                if(ch == ' ') {
+            for(const char& ch : fileLine)
+            {
+                if(ch == ' ')
+                {
                     if(!current.empty()) // Omit fancy spaces
                         args.push_back(current);
                     current = "";
@@ -207,16 +246,21 @@ namespace rpge {
                 continue;
             // Interpret the arguments as a single-letter command
             char cmd = args.at(0)[0];
-            switch(cmd) {
+            switch(cmd)
+            {
                 // Single line comment
                 case '#':
                     continue;
                 // Define world size
-                case 's': {
-                    if(args.size() != 3) {
+                case 's':
+                {
+                    if(args.size() != 3)
+                    {
                         error = E_RPS_INVALID_ARGUMENTS_COUNT;
                         return ln;
-                    } else if(!isFloat(args.at(1)) || !isFloat(args.at(2))) {
+                    }
+                    else if(!isFloat(args.at(1)) || !isFloat(args.at(2)))
+                    {
                         error = E_RPS_UNKNOWN_NUMBER_FORMAT;
                         return ln;
                     }
@@ -227,17 +271,22 @@ namespace rpge {
                     break;
                 }
                 // Define next world data height (counting from top)
-                case 'w': {
-                    if(wdh == -1) {
+                case 'w':
+                {
+                    if(wdh == -1)
+                    {
                         error = E_RPS_OPERATION_NOT_AVAILABLE;
                         return ln;
                     }
-                    if(args.size() != width + 1) {
+                    if(args.size() != width + 1)
+                    {
                         error = E_RPS_INVALID_ARGUMENTS_COUNT;
                         return ln;
                     }
-                    for(int x = 0; x < width; x++) {
-                        if(!isFloat(args.at(1 + x))) {
+                    for(int x = 0; x < width; x++)
+                    {
+                        if(!isFloat(args.at(1 + x)))
+                        {
                             error = E_RPS_UNKNOWN_NUMBER_FORMAT;
                             return ln;
                         }
@@ -247,24 +296,29 @@ namespace rpge {
                     break;
                 }
                 // Define properties of a tile with specified data
-                case 't': {
-                    if(args.size() != 21) {
+                case 't':
+                {
+                    if(args.size() != 21)
+                    {
                         error = E_RPS_INVALID_ARGUMENTS_COUNT;
                         return ln;
-                    } else if(!(
+                    }
+                    else if(!(
                         isFloat(args.at(1))  && isFloat(args.at(3))  && isFloat(args.at(4))  &&
                         isFloat(args.at(6))  && isFloat(args.at(7))  && isFloat(args.at(8))  &&
                         isFloat(args.at(9))  && isFloat(args.at(10)) && isFloat(args.at(11)) &&
                         isFloat(args.at(13)) && isFloat(args.at(15)) && isFloat(args.at(16)) &&
                         isFloat(args.at(17)) && isFloat(args.at(18))
-                    )) {
+                    ))
+                    {
                         error = E_RPS_UNKNOWN_NUMBER_FORMAT;
                         return ln;
                     }
 
                     string text = args.at(20);
                     int tLen = text.length();
-                    if(tLen < 2 || text[0] != '"' || text[tLen - 1] != '"') {
+                    if(tLen < 2 || text[0] != '"' || text[tLen - 1] != '"')
+                    {
                         error = E_RPS_UNKNOWN_STRING_FORMAT;
                         return ln;
                     }
@@ -297,7 +351,8 @@ namespace rpge {
                     );
                     break;
                 }
-                default: {
+                default:
+                {
                     error = E_RPS_OPERATION_NOT_AVAILABLE;
                     return ln;
                     break;
@@ -309,7 +364,8 @@ namespace rpge {
         return ln;
     }
     #ifdef DEBUG
-    ostream& operator<<(ostream& stream, const Scene& scene) {
+    ostream& operator<<(ostream& stream, const Scene& scene)
+    {
         stream << "Plane(width=" << scene.getWidth() << ",height=" << scene.getHeight() << ")";
         return stream;
     }
