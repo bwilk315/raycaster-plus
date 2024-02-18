@@ -1,7 +1,7 @@
 
 Things to do in the future:
 [x] write EXAMPLE.md
-- write RPS.md
+[x] write RPS.md
 - Add such function in scene module, that would enable to load it from string
 - Implement support for Windows platform
 - Remake CMake configuration file to be professional and cross-platform
